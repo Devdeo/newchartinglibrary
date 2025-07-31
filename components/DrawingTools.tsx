@@ -27,40 +27,55 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ drawingMode, setDrawingMode
     <div style={{
       position: 'absolute',
       top: '60px',
-      right: '10px',
+      left: '10px',
       backgroundColor: 'white',
       border: '1px solid #ddd',
       borderRadius: '8px',
-      padding: '10px',
+      padding: '8px',
       boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
       zIndex: 1000,
-      width: '200px'
+      width: 'min(180px, calc(100vw - 20px))',
+      maxHeight: 'calc(100vh - 120px)',
+      overflowY: 'auto'
     }}>
-      <h4 style={{ margin: '0 0 10px 0', fontSize: '14px' }}>Drawing Tools</h4>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '5px' }}>
+      <h4 style={{ margin: '0 0 8px 0', fontSize: '12px', textAlign: 'center' }}>Drawing Tools</h4>
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: window.innerWidth > 768 ? '1fr' : 'repeat(2, 1fr)', 
+        gap: '3px' 
+      }}>
         {tools.map(tool => (
           <button
             key={tool.value}
             onClick={() => setDrawingMode(tool.value)}
             style={{
-              padding: '8px',
+              padding: window.innerWidth > 768 ? '6px 8px' : '4px',
               border: '1px solid #ddd',
-              borderRadius: '4px',
+              borderRadius: '3px',
               backgroundColor: drawingMode === tool.value ? '#2196F3' : 'white',
               color: drawingMode === tool.value ? 'white' : 'black',
               cursor: 'pointer',
-              fontSize: '12px',
+              fontSize: window.innerWidth > 768 ? '11px' : '9px',
               display: 'flex',
-              flexDirection: 'row',
+              flexDirection: window.innerWidth > 768 ? 'row' : 'column',
               alignItems: 'center',
-              gap: '8px',
+              justifyContent: 'center',
+              gap: window.innerWidth > 768 ? '6px' : '2px',
               width: '100%',
-              textAlign: 'left'
+              textAlign: 'center',
+              minHeight: '32px'
             }}
             title={tool.label}
           >
-            <span style={{ fontSize: '16px' }}>{tool.icon}</span>
-            <span>{tool.label}</span>
+            <span style={{ fontSize: window.innerWidth > 768 ? '14px' : '12px' }}>{tool.icon}</span>
+            <span style={{ 
+              whiteSpace: 'nowrap', 
+              overflow: 'hidden', 
+              textOverflow: 'ellipsis',
+              maxWidth: '100%'
+            }}>
+              {window.innerWidth > 768 ? tool.label : tool.label.split(' ')[0]}
+            </span>
           </button>
         ))}
       </div>

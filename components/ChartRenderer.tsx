@@ -33,8 +33,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     if (!chartRef.current || !svgRef.current) return;
 
     const totalWidth = chartRef.current.clientWidth;
-    const oiPanelWidth = config.showOI ? totalWidth * 0.35 : 0;
-    const margin = { top: 20, right: oiPanelWidth + 20, bottom: 50, left: 50 };
+    const margin = { top: 20, right: 20, bottom: 50, left: 50 };
     const width = totalWidth - margin.left - margin.right;
     const height = chartRef.current.clientHeight - margin.top - margin.bottom;
 
@@ -51,7 +50,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     // Setup scales
     const xScale = d3.scaleTime()
       .domain(d3.extent(data, d => d.date) as [Date, Date])
-      .range([0, width]);
+      .range([0, width * 0.75]); // Leave space for OI histogram on right
 
     const yScale = d3.scaleLinear()
       .domain(d3.extent(data, d => Math.max(d.high, d.low)) as [number, number])
@@ -59,7 +58,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
     const volumeScale = d3.scaleLinear()
       .domain([0, d3.max(data, d => d.volume) as number])
-      .range([height, height * 0.8]);
+      .range([height * 0.7, height * 0.75]); // Volume in bottom section of main chart
 
     // Setup zoom
     const zoom = d3.zoom<SVGSVGElement, unknown>()
@@ -117,7 +116,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
       // Render OI data if enabled (before drawings to keep drawings on top)
       if (config.showOI) {
-        renderOIData(g, currentXScale, currentYScale, oiPanelWidth);
+        renderOIData(g, currentXScale, currentYScale);
       }
 
       // Render drawings (always on top)
@@ -255,7 +254,8 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       .attr("y", d => volumeScale(d.volume))
       .attr("width", barWidth)
       .attr("height", d => volumeScale.range()[0] - volumeScale(d.volume))
-      .attr("fill", "rgba(156, 156, 156, 0.5)");
+      .attr("fill", "rgba(156, 156, 156, 0.3)")
+      .attr("opacity", 0.7);
   };
 
   const renderIndicators = (g: any, xScale: any, yScale: any) => {
@@ -587,7 +587,9 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     }
   };
 
-  const renderOIData = (g: any, xScale: any, yScale: any, oiPanelWidth: number) => {
+  const renderOIData = (g: any, xScale: any, yScale: any) => {
+    if (!config.showOI) return;
+    
     // Current price for reference
     const currentPrice = data.length > 0 ? data[data.length - 1].close : 50000;
 
@@ -603,10 +605,11 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     const maxCE_Change = Math.max(...visibleOI.map(oi => Math.abs(oi.ce.changeOI)));
     const maxPE_Change = Math.max(...visibleOI.map(oi => Math.abs(oi.pe.changeOI)));
 
-    // Maximum bar width (% of chart width)
-    const maxBarWidth = xScale.range()[1] * 0.25; // 25% of chart width
+    // Maximum bar width - use the right 25% of total width
+    const oiAreaWidth = width * 0.25;
+    const maxBarWidth = oiAreaWidth * 0.8;
 
-    // Base X position (right side of chart) - moved outside the loop
+    // Base X position (right side of price chart)
     const baseX = xScale.range()[1] + 10;
 
     // Create OI histogram overlay container with proper layering
@@ -732,9 +735,9 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       .attr("fill", "white")
       .text(currentPrice.toFixed(0));
 
-    // Legend for OI histogram colors
+    // Legend for OI histogram colors - position at top right of OI area
     const legendX = baseX;
-    const legendY = yScale.range()[1] + 20;
+    const legendY = 10;
     const legendItems = [
       { color: "#ef5350", label: "CE OI", y: 0 },
       { color: "#66bb6a", label: "PE OI", y: 15 },
@@ -779,10 +782,10 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     const totalPE_OI = visibleOI.reduce((sum, oi) => sum + oi.pe.oi, 0);
     const pcr = totalPE_OI / totalCE_OI;
 
-    // PCR indicator
+    // PCR indicator - position below legend
     oiOverlay.append("rect")
       .attr("x", legendX)
-      .attr("y", legendY + 80)
+      .attr("y", legendY + 75)
       .attr("width", 80)
       .attr("height", 25)
       .attr("fill", "rgba(255, 255, 255, 0.9)")
@@ -791,7 +794,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
     oiOverlay.append("text")
       .attr("x", legendX + 40)
-      .attr("y", legendY + 93)
+      .attr("y", legendY + 88)
       .attr("text-anchor", "middle")
       .attr("font-size", "11px")
       .attr("font-weight", "bold")

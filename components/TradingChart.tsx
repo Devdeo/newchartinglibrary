@@ -151,14 +151,21 @@ const TradingChart: React.FC = () => {
         drawingMode={drawingMode}
         setDrawingMode={setDrawingMode}
       />
-      <div ref={chartRef} style={{ width: '100%', height: '750px' }}>
-        <ChartRenderer 
-          data={data}
-          oiData={oiData}
-          config={config}
-          chartRef={chartRef}
-          drawingMode={drawingMode}
-        />
+      <div style={{ display: 'flex', height: '750px' }}>
+        <div ref={chartRef} style={{ 
+          flex: 1, 
+          height: '100%',
+          marginLeft: window.innerWidth > 768 ? '200px' : '20px',
+          marginRight: '10px'
+        }}>
+          <ChartRenderer 
+            data={data}
+            oiData={oiData}
+            config={config}
+            chartRef={chartRef}
+            drawingMode={drawingMode}
+          />
+        </div>
       </div>
       <DrawingTools 
         drawingMode={drawingMode}
