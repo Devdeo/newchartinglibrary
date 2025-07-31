@@ -626,10 +626,9 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     const panelWidth = oiPanelWidth - 20;
     const headers = [
       { text: "CE OI", x: panelWidth * 0.15, align: "middle" },
-      { text: "Chg", x: panelWidth * 0.25, align: "middle" },
-      { text: "Histogram", x: panelWidth * 0.5, align: "middle" },
-      { text: "PE OI", x: panelWidth * 0.75, align: "middle" },
-      { text: "Chg", x: panelWidth * 0.85, align: "middle" },
+      { text: "PE OI", x: panelWidth * 0.35, align: "middle" },
+      { text: "CE Chg", x: panelWidth * 0.55, align: "middle" },
+      { text: "PE Chg", x: panelWidth * 0.75, align: "middle" },
       { text: "Strike", x: panelWidth * 0.95, align: "middle" }
     ];
 
@@ -688,8 +687,9 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         .attr("fill", atmBg)
         .attr("rx", 2);
 
-      // CE side (left in panel)
+      // CE side colors
       const ceColor = isITM_CE ? "#1565c0" : "#42a5f5";
+      const peColor = isITM_PE ? "#c62828" : "#ef5350";
       
       // CE OI with background highlight for ITM
       if (isITM_CE) {
@@ -702,6 +702,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .attr("rx", 2);
       }
 
+      // CE OI (Column 1)
       oiContainer.append("text")
         .attr("class", "oi-ce")
         .attr("x", panelWidth * 0.15)
@@ -712,60 +713,10 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         .attr("fill", ceColor)
         .text(formatOI(oi.ce.oi));
 
-      // CE Change with arrows
-      const ceChangeIcon = oi.ce.changeOI >= 0 ? "▲" : "▼";
-      oiContainer.append("text")
-        .attr("class", "oi-ce-change")
-        .attr("x", panelWidth * 0.25)
-        .attr("y", rowY)
-        .attr("text-anchor", "middle")
-        .attr("font-size", "8px")
-        .attr("fill", oi.ce.changeOI >= 0 ? "#4caf50" : "#f44336")
-        .text(ceChangeIcon + formatChange(Math.abs(oi.ce.changeOI)));
-
-      // Histogram in center
-      const maxHistogramWidth = panelWidth * 0.2;
-      const ceBarWidth = (oi.ce.oi / maxOI) * maxHistogramWidth;
-      const peBarWidth = (oi.pe.oi / maxOI) * maxHistogramWidth;
-      const centerX = panelWidth * 0.5;
-
-      // CE bar (left side of center)
-      oiContainer.append("rect")
-        .attr("x", centerX - ceBarWidth)
-        .attr("y", rowY - 6)
-        .attr("width", ceBarWidth)
-        .attr("height", 12)
-        .attr("fill", ceColor)
-        .attr("opacity", 0.7)
-        .attr("rx", 1);
-
-      // PE bar (right side of center)
-      oiContainer.append("rect")
-        .attr("x", centerX)
-        .attr("y", rowY - 6)
-        .attr("width", peBarWidth)
-        .attr("height", 12)
-        .attr("fill", "#d32f2f")
-        .attr("opacity", 0.7)
-        .attr("rx", 1);
-
-      // Center line
-      oiContainer.append("line")
-        .attr("x1", centerX)
-        .attr("x2", centerX)
-        .attr("y1", rowY - 8)
-        .attr("y2", rowY + 8)
-        .attr("stroke", "#666")
-        .attr("stroke-width", 1)
-        .attr("opacity", 0.5);
-
-      // PE side (right in panel)
-      const peColor = isITM_PE ? "#c62828" : "#ef5350";
-      
-      // PE OI with background highlight for ITM
+      // PE OI with background highlight for ITM (Column 2)
       if (isITM_PE) {
         oiContainer.append("rect")
-          .attr("x", panelWidth * 0.68)
+          .attr("x", panelWidth * 0.28)
           .attr("y", rowY - 8)
           .attr("width", panelWidth * 0.14)
           .attr("height", 16)
@@ -775,7 +726,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
       oiContainer.append("text")
         .attr("class", "oi-pe")
-        .attr("x", panelWidth * 0.75)
+        .attr("x", panelWidth * 0.35)
         .attr("y", rowY)
         .attr("text-anchor", "middle")
         .attr("font-size", "9px")
@@ -783,18 +734,29 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         .attr("fill", peColor)
         .text(formatOI(oi.pe.oi));
 
-      // PE Change with arrows
+      // CE Change with arrows (Column 3)
+      const ceChangeIcon = oi.ce.changeOI >= 0 ? "▲" : "▼";
+      oiContainer.append("text")
+        .attr("class", "oi-ce-change")
+        .attr("x", panelWidth * 0.55)
+        .attr("y", rowY)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "8px")
+        .attr("fill", oi.ce.changeOI >= 0 ? "#4caf50" : "#f44336")
+        .text(ceChangeIcon + formatChange(Math.abs(oi.ce.changeOI)));
+
+      // PE Change with arrows (Column 4)
       const peChangeIcon = oi.pe.changeOI >= 0 ? "▲" : "▼";
       oiContainer.append("text")
         .attr("class", "oi-pe-change")
-        .attr("x", panelWidth * 0.85)
+        .attr("x", panelWidth * 0.75)
         .attr("y", rowY)
         .attr("text-anchor", "middle")
         .attr("font-size", "8px")
         .attr("fill", oi.pe.changeOI >= 0 ? "#4caf50" : "#f44336")
         .text(peChangeIcon + formatChange(Math.abs(oi.pe.changeOI)));
 
-      // Strike price with enhanced styling (rightmost)
+      // Strike price with enhanced styling (Column 5 - rightmost)
       oiContainer.append("text")
         .attr("class", "oi-strike")
         .attr("x", panelWidth * 0.95)
