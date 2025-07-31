@@ -116,7 +116,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
       // Render OI data if enabled (before drawings to keep drawings on top)
       if (config.showOI) {
-        renderOIData(g, currentXScale, currentYScale);
+        renderOIData(g, currentXScale, currentYScale, width);
       }
 
       // Render drawings (always on top)
@@ -587,7 +587,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     }
   };
 
-  const renderOIData = (g: any, xScale: any, yScale: any) => {
+  const renderOIData = (g: any, xScale: any, yScale: any, width: number) => {
     if (!config.showOI) return;
     
     // Current price for reference
