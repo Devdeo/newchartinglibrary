@@ -2,10 +2,11 @@
 import React, { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import * as TI from 'technicalindicators';
-import { CandleData, ChartConfig } from './TradingChart';
+import { CandleData, ChartConfig, OIData } from './TradingChart';
 
 interface ChartRendererProps {
   data: CandleData[];
+  oiData: OIData[];
   config: ChartConfig;
   chartRef: React.RefObject<HTMLDivElement>;
   drawingMode: string;
@@ -13,6 +14,7 @@ interface ChartRendererProps {
 
 const ChartRenderer: React.FC<ChartRendererProps> = ({ 
   data, 
+  oiData,
   config, 
   chartRef, 
   drawingMode 
@@ -30,7 +32,8 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   const renderChart = () => {
     if (!chartRef.current || !svgRef.current) return;
 
-    const margin = { top: 20, right: 220, bottom: 50, left: 50 };
+    const oiPanelWidth = config.showOI ? 300 : 0;
+    const margin = { top: 20, right: 220, bottom: 50, left: 50 + oiPanelWidth };
     const width = chartRef.current.clientWidth - margin.left - margin.right;
     const height = chartRef.current.clientHeight - margin.top - margin.bottom;
 
@@ -109,6 +112,11 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
       // Render axes
       renderAxes(g, currentXScale, currentYScale, width, height);
+
+      // Render OI data if enabled
+      if (config.showOI) {
+        renderOIData(g, currentXScale, currentYScale, oiPanelWidth);
+      }
 
       // Render drawings
       renderDrawings(g, currentXScale, currentYScale);
@@ -578,6 +586,193 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     }
   };
 
+  const renderOIData = (g: any, xScale: any, yScale: any, oiPanelWidth: number) => {
+    const oiContainer = g.append("g")
+      .attr("class", "oi-container")
+      .attr("transform", `translate(${-oiPanelWidth}, 0)`);
+
+    // OI Panel Background
+    oiContainer.append("rect")
+      .attr("class", "oi-background")
+      .attr("x", 0)
+      .attr("y", 0)
+      .attr("width", oiPanelWidth - 10)
+      .attr("height", yScale.range()[0])
+      .attr("fill", "rgba(248, 249, 250, 0.95)")
+      .attr("stroke", "#e9ecef")
+      .attr("stroke-width", 1);
+
+    // Headers
+    const headerY = 20;
+    const headers = [
+      { text: "Strike", x: 30, align: "middle" },
+      { text: "CE OI", x: 90, align: "middle" },
+      { text: "Change", x: 130, align: "middle" },
+      { text: "PE OI", x: 190, align: "middle" },
+      { text: "Change", x: 230, align: "middle" }
+    ];
+
+    headers.forEach(header => {
+      oiContainer.append("text")
+        .attr("class", "oi-header")
+        .attr("x", header.x)
+        .attr("y", headerY)
+        .attr("text-anchor", header.align)
+        .attr("font-size", "11px")
+        .attr("font-weight", "bold")
+        .attr("fill", "#495057")
+        .text(header.text);
+    });
+
+    // Draw separator line
+    oiContainer.append("line")
+      .attr("x1", 10)
+      .attr("x2", oiPanelWidth - 20)
+      .attr("y1", headerY + 10)
+      .attr("y2", headerY + 10)
+      .attr("stroke", "#dee2e6")
+      .attr("stroke-width", 1);
+
+    // Current price line for reference
+    const currentPrice = data.length > 0 ? data[data.length - 1].close : 50000;
+
+    // Filter and sort OI data by strike price
+    const visibleOI = oiData
+      .filter(oi => Math.abs(oi.strikePrice - currentPrice) <= currentPrice * 0.1) // Show strikes within 10% of current price
+      .sort((a, b) => b.strikePrice - a.strikePrice);
+
+    // Render OI data rows
+    visibleOI.forEach((oi, index) => {
+      const rowY = headerY + 30 + (index * 18);
+      
+      if (rowY > yScale.range()[0] - 20) return; // Don't render if out of bounds
+
+      const isNearMoney = Math.abs(oi.strikePrice - currentPrice) <= 1000;
+      const rowBg = isNearMoney ? "rgba(255, 235, 59, 0.1)" : "transparent";
+
+      // Row background for near money strikes
+      if (isNearMoney) {
+        oiContainer.append("rect")
+          .attr("x", 10)
+          .attr("y", rowY - 8)
+          .attr("width", oiPanelWidth - 30)
+          .attr("height", 16)
+          .attr("fill", rowBg)
+          .attr("rx", 2);
+      }
+
+      // Strike price (left side, aligned with price axis)
+      oiContainer.append("text")
+        .attr("class", "oi-strike")
+        .attr("x", 30)
+        .attr("y", rowY)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "10px")
+        .attr("font-weight", isNearMoney ? "bold" : "normal")
+        .attr("fill", isNearMoney ? "#f57c00" : "#666")
+        .text(oi.strikePrice.toLocaleString());
+
+      // CE OI
+      oiContainer.append("text")
+        .attr("class", "oi-ce")
+        .attr("x", 90)
+        .attr("y", rowY)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "9px")
+        .attr("fill", "#1976d2")
+        .text(formatOI(oi.ce.oi));
+
+      // CE Change
+      oiContainer.append("text")
+        .attr("class", "oi-ce-change")
+        .attr("x", 130)
+        .attr("y", rowY)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "9px")
+        .attr("fill", oi.ce.changeOI >= 0 ? "#4caf50" : "#f44336")
+        .text(formatChange(oi.ce.changeOI));
+
+      // PE OI
+      oiContainer.append("text")
+        .attr("class", "oi-pe")
+        .attr("x", 190)
+        .attr("y", rowY)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "9px")
+        .attr("fill", "#d32f2f")
+        .text(formatOI(oi.pe.oi));
+
+      // PE Change
+      oiContainer.append("text")
+        .attr("class", "oi-pe-change")
+        .attr("x", 230)
+        .attr("y", rowY)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "9px")
+        .attr("fill", oi.pe.changeOI >= 0 ? "#4caf50" : "#f44336")
+        .text(formatChange(oi.pe.changeOI));
+
+      // Strike price line extending to chart
+      const strikeY = yScale(oi.strikePrice);
+      if (strikeY >= 0 && strikeY <= yScale.range()[0]) {
+        g.append("line")
+          .attr("class", "strike-line")
+          .attr("x1", -oiPanelWidth + 10)
+          .attr("x2", 0)
+          .attr("y1", strikeY)
+          .attr("y2", strikeY)
+          .attr("stroke", isNearMoney ? "#ff9800" : "#e0e0e0")
+          .attr("stroke-width", isNearMoney ? 1.5 : 0.5)
+          .attr("stroke-dasharray", isNearMoney ? "none" : "2,2")
+          .attr("opacity", 0.7);
+      }
+    });
+
+    // Current price indicator line
+    const currentPriceY = yScale(currentPrice);
+    g.append("line")
+      .attr("class", "current-price-line")
+      .attr("x1", -oiPanelWidth + 10)
+      .attr("x2", xScale.range()[1])
+      .attr("y1", currentPriceY)
+      .attr("y2", currentPriceY)
+      .attr("stroke", "#ff5722")
+      .attr("stroke-width", 2)
+      .attr("opacity", 0.8);
+
+    // Current price label
+    oiContainer.append("rect")
+      .attr("x", 10)
+      .attr("y", currentPriceY - 10)
+      .attr("width", 60)
+      .attr("height", 20)
+      .attr("fill", "#ff5722")
+      .attr("rx", 3);
+
+    oiContainer.append("text")
+      .attr("x", 40)
+      .attr("y", currentPriceY + 4)
+      .attr("text-anchor", "middle")
+      .attr("font-size", "10px")
+      .attr("font-weight", "bold")
+      .attr("fill", "white")
+      .text(currentPrice.toFixed(0));
+  };
+
+  const formatOI = (value: number): string => {
+    if (value >= 100000) {
+      return (value / 100000).toFixed(1) + 'L';
+    } else if (value >= 1000) {
+      return (value / 1000).toFixed(1) + 'K';
+    }
+    return value.toString();
+  };
+
+  const formatChange = (value: number): string => {
+    const sign = value >= 0 ? '+' : '';
+    return sign + formatOI(Math.abs(value));
+  };
+
   const renderAxes = (g: any, xScale: any, yScale: any, width: number, height: number) => {
     // X-axis
     g.append("g")
@@ -585,7 +780,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       .attr("transform", `translate(0,${height * 0.7})`)
       .call(d3.axisBottom(xScale).tickFormat(d3.timeFormat("%m/%d")));
 
-    // Y-axis
+    // Left Y-axis (for prices and strikes)
     g.append("g")
       .attr("class", "axis y-axis")
       .call(d3.axisLeft(yScale));

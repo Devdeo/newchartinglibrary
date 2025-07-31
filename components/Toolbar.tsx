@@ -231,6 +231,19 @@ const Toolbar: React.FC<ToolbarProps> = ({ config, setConfig, drawingMode, setDr
         </select>
       </div>
 
+      {/* Show OI Data */}
+      <div>
+        <label>
+          <input
+            type="checkbox"
+            checked={config.showOI}
+            onChange={(e) => setConfig({ ...config, showOI: e.target.checked })}
+            style={{ marginRight: '5px' }}
+          />
+          Show OI Data
+        </label>
+      </div>
+
       {/* Indicators */}
       <div>
         <label>Indicators: </label>

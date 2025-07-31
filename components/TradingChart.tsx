@@ -15,11 +15,24 @@ export interface CandleData {
   volume: number;
 }
 
+export interface OIData {
+  strikePrice: number;
+  ce: {
+    oi: number;
+    changeOI: number;
+  };
+  pe: {
+    oi: number;
+    changeOI: number;
+  };
+}
+
 export interface ChartConfig {
   chartType: 'candlestick' | 'line' | 'area' | 'bar' | 'heikinashi';
   indicators: string[];
   timeframe: string;
   symbol: string;
+  showOI: boolean;
   indicatorConfig?: {
     [key: string]: {
       [param: string]: number;
@@ -30,11 +43,13 @@ export interface ChartConfig {
 const TradingChart: React.FC = () => {
   const chartRef = useRef<HTMLDivElement>(null);
   const [data, setData] = useState<CandleData[]>([]);
+  const [oiData, setOiData] = useState<OIData[]>([]);
   const [config, setConfig] = useState<ChartConfig>({
     chartType: 'candlestick',
     indicators: [],
     timeframe: '1D',
-    symbol: 'BTCUSDT'
+    symbol: 'BTCUSDT',
+    showOI: false
   });
   const [drawingMode, setDrawingMode] = useState<string>('none');
 
@@ -42,6 +57,10 @@ const TradingChart: React.FC = () => {
     // Generate sample data
     const sampleData = generateSampleData();
     setData(sampleData);
+    
+    // Generate OI data
+    const sampleOI = generateOIData();
+    setOiData(sampleOI);
   }, []);
 
   const generateSampleData = (): CandleData[] => {
@@ -74,6 +93,31 @@ const TradingChart: React.FC = () => {
     return data;
   };
 
+  const generateOIData = (): OIData[] => {
+    const oiData: OIData[] = [];
+    const basePrice = 50000;
+    const strikeGap = 500;
+    
+    // Generate strikes from -20% to +20% of base price
+    for (let i = -20; i <= 20; i++) {
+      const strikePrice = basePrice + (i * strikeGap);
+      
+      oiData.push({
+        strikePrice,
+        ce: {
+          oi: Math.floor(Math.random() * 10000) + 1000,
+          changeOI: Math.floor((Math.random() - 0.5) * 2000)
+        },
+        pe: {
+          oi: Math.floor(Math.random() * 10000) + 1000,
+          changeOI: Math.floor((Math.random() - 0.5) * 2000)
+        }
+      });
+    }
+    
+    return oiData;
+  };
+
   return (
     <div style={{ width: '100%', height: '800px', position: 'relative' }}>
       <Toolbar 
@@ -85,6 +129,7 @@ const TradingChart: React.FC = () => {
       <div ref={chartRef} style={{ width: '100%', height: '750px' }}>
         <ChartRenderer 
           data={data}
+          oiData={oiData}
           config={config}
           chartRef={chartRef}
           drawingMode={drawingMode}
