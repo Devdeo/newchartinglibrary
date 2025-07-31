@@ -41,7 +41,7 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ drawingMode, setDrawingMode
       <h4 style={{ margin: '0 0 8px 0', fontSize: '12px', textAlign: 'center' }}>Drawing Tools</h4>
       <div style={{ 
         display: 'grid', 
-        gridTemplateColumns: window.innerWidth > 768 ? '1fr' : 'repeat(2, 1fr)', 
+        gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth > 768 ? '1fr' : 'repeat(2, 1fr)', 
         gap: '3px' 
       }}>
         {tools.map(tool => (
@@ -49,32 +49,32 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ drawingMode, setDrawingMode
             key={tool.value}
             onClick={() => setDrawingMode(tool.value)}
             style={{
-              padding: window.innerWidth > 768 ? '6px 8px' : '4px',
+              padding: typeof window !== 'undefined' && window.innerWidth > 768 ? '6px 8px' : '4px',
               border: '1px solid #ddd',
               borderRadius: '3px',
               backgroundColor: drawingMode === tool.value ? '#2196F3' : 'white',
               color: drawingMode === tool.value ? 'white' : 'black',
               cursor: 'pointer',
-              fontSize: window.innerWidth > 768 ? '11px' : '9px',
+              fontSize: typeof window !== 'undefined' && window.innerWidth > 768 ? '11px' : '9px',
               display: 'flex',
-              flexDirection: window.innerWidth > 768 ? 'row' : 'column',
+              flexDirection: typeof window !== 'undefined' && window.innerWidth > 768 ? 'row' : 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: window.innerWidth > 768 ? '6px' : '2px',
+              gap: typeof window !== 'undefined' && window.innerWidth > 768 ? '6px' : '2px',
               width: '100%',
               textAlign: 'center',
               minHeight: '32px'
             }}
             title={tool.label}
           >
-            <span style={{ fontSize: window.innerWidth > 768 ? '14px' : '12px' }}>{tool.icon}</span>
+            <span style={{ fontSize: typeof window !== 'undefined' && window.innerWidth > 768 ? '14px' : '12px' }}>{tool.icon}</span>
             <span style={{ 
               whiteSpace: 'nowrap', 
               overflow: 'hidden', 
               textOverflow: 'ellipsis',
               maxWidth: '100%'
             }}>
-              {window.innerWidth > 768 ? tool.label : tool.label.split(' ')[0]}
+              {typeof window !== 'undefined' && window.innerWidth > 768 ? tool.label : tool.label.split(' ')[0]}
             </span>
           </button>
         ))}
