@@ -80,11 +80,12 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     updateChart(xScale, yScale);
 
     function updateChart(currentXScale: any, currentYScale: any) {
-      // Clear previous elements
+      // Clear previous elements (but preserve drawings)
       g.selectAll(".candle").remove();
       g.selectAll(".volume-bar").remove();
       g.selectAll(".axis").remove();
       g.selectAll(".indicator").remove();
+      g.selectAll(".oi-overlay").remove(); // Clear OI overlay separately
 
       // Render based on chart type
       switch (config.chartType) {
@@ -114,12 +115,12 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       // Render axes
       renderAxes(g, currentXScale, currentYScale, width, height);
 
-      // Render OI data if enabled
+      // Render OI data if enabled (before drawings to keep drawings on top)
       if (config.showOI) {
         renderOIData(g, currentXScale, currentYScale, oiPanelWidth);
       }
 
-      // Render drawings
+      // Render drawings (always on top)
       renderDrawings(g, currentXScale, currentYScale);
     }
 
@@ -609,9 +610,10 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     // Base X position (right side of chart) - moved outside the loop
     const baseX = xScale.range()[1] + 10;
 
-    // Create OI histogram overlay container
+    // Create OI histogram overlay container with proper layering
     const oiOverlay = g.append("g")
-      .attr("class", "oi-overlay");
+      .attr("class", "oi-overlay")
+      .style("pointer-events", "none"); // Prevent interference with drawing interactions
 
     // Render histogram bars for each strike price
     visibleOI.forEach(oi => {
@@ -834,16 +836,24 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   };
 
   const renderDrawings = (g: any, xScale: any, yScale: any) => {
+    // Remove existing drawings first
+    g.selectAll(".drawing").remove();
+    
+    // Create drawings layer on top
+    const drawingsLayer = g.append("g")
+      .attr("class", "drawings-layer")
+      .style("pointer-events", "all"); // Enable interactions for drawings
+    
     drawingsRef.current.forEach(drawing => {
       switch (drawing.type) {
         case 'line':
-          renderTrendLine(g, drawing, xScale, yScale);
+          renderTrendLine(drawingsLayer, drawing, xScale, yScale);
           break;
         case 'rectangle':
-          renderRectangle(g, drawing, xScale, yScale);
+          renderRectangle(drawingsLayer, drawing, xScale, yScale);
           break;
         case 'fibonacci':
-          renderFibonacci(g, drawing, xScale, yScale);
+          renderFibonacci(drawingsLayer, drawing, xScale, yScale);
           break;
       }
     });
@@ -935,8 +945,9 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
       currentDrawing.end = { x: dateX, y: priceY };
 
-      // Update preview
+      // Update preview (clear all previews first)
       g.selectAll(".drawing-preview").remove();
+      g.selectAll(".drawing-preview-layer").remove();
       renderDrawingPreview(g, currentDrawing, xScale, yScale);
     });
 
@@ -946,7 +957,9 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       drawing = false;
       drawingsRef.current.push({ ...currentDrawing });
       
+      // Clean up preview elements
       g.selectAll(".drawing-preview").remove();
+      g.selectAll(".drawing-preview-layer").remove();
       renderDrawings(g, xScale, yScale);
       
       currentDrawing = null;
@@ -954,9 +967,17 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   };
 
   const renderDrawingPreview = (g: any, drawing: any, xScale: any, yScale: any) => {
+    // Create or get preview layer (always on top)
+    let previewLayer = g.select(".drawing-preview-layer");
+    if (previewLayer.empty()) {
+      previewLayer = g.append("g")
+        .attr("class", "drawing-preview-layer")
+        .style("pointer-events", "none");
+    }
+    
     switch (drawing.type) {
       case 'line':
-        g.append("line")
+        previewLayer.append("line")
           .attr("class", "drawing-preview")
           .attr("x1", xScale(drawing.start.x))
           .attr("y1", yScale(drawing.start.y))
