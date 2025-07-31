@@ -32,9 +32,10 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   const renderChart = () => {
     if (!chartRef.current || !svgRef.current) return;
 
-    const oiPanelWidth = config.showOI ? 350 : 0;
-    const margin = { top: 20, right: 220, bottom: 50, left: 50 + oiPanelWidth };
-    const width = chartRef.current.clientWidth - margin.left - margin.right;
+    const totalWidth = chartRef.current.clientWidth;
+    const oiPanelWidth = config.showOI ? totalWidth * 0.35 : 0;
+    const margin = { top: 20, right: oiPanelWidth + 20, bottom: 50, left: 50 };
+    const width = totalWidth - margin.left - margin.right;
     const height = chartRef.current.clientHeight - margin.top - margin.bottom;
 
     // Clear previous chart
@@ -589,7 +590,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   const renderOIData = (g: any, xScale: any, yScale: any, oiPanelWidth: number) => {
     const oiContainer = g.append("g")
       .attr("class", "oi-container")
-      .attr("transform", `translate(${-oiPanelWidth}, 0)`);
+      .attr("transform", `translate(${xScale.range()[1] + 20}, 0)`);
 
     // OI Panel Background with gradient
     const defs = oiContainer.append("defs");
@@ -614,7 +615,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       .attr("class", "oi-background")
       .attr("x", 0)
       .attr("y", 0)
-      .attr("width", oiPanelWidth - 10)
+      .attr("width", oiPanelWidth - 20)
       .attr("height", yScale.range()[0])
       .attr("fill", "url(#oi-background-gradient)")
       .attr("stroke", "#e9ecef")
@@ -622,20 +623,21 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
     // Headers with better styling
     const headerY = 25;
+    const panelWidth = oiPanelWidth - 20;
     const headers = [
-      { text: "Strike", x: 40, align: "middle", width: 60 },
-      { text: "CE OI", x: 110, align: "middle", width: 50 },
-      { text: "Chg", x: 145, align: "middle", width: 35 },
-      { text: "OI Chart", x: 200, align: "middle", width: 80 },
-      { text: "PE OI", x: 260, align: "middle", width: 50 },
-      { text: "Chg", x: 295, align: "middle", width: 35 }
+      { text: "CE OI", x: panelWidth * 0.15, align: "middle" },
+      { text: "Chg", x: panelWidth * 0.25, align: "middle" },
+      { text: "Histogram", x: panelWidth * 0.5, align: "middle" },
+      { text: "PE OI", x: panelWidth * 0.75, align: "middle" },
+      { text: "Chg", x: panelWidth * 0.85, align: "middle" },
+      { text: "Strike", x: panelWidth * 0.95, align: "middle" }
     ];
 
     // Header background
     oiContainer.append("rect")
       .attr("x", 5)
       .attr("y", 5)
-      .attr("width", oiPanelWidth - 20)
+      .attr("width", panelWidth - 10)
       .attr("height", 30)
       .attr("fill", "#6c757d")
       .attr("rx", 4);
@@ -664,7 +666,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     const maxOI = Math.max(...visibleOI.map(oi => Math.max(oi.ce.oi, oi.pe.oi)));
     const maxBarWidth = 35;
 
-    // Render OI data rows with enhanced visuals
+    // Render OI data rows with enhanced visuals in right panel
     visibleOI.forEach((oi, index) => {
       const rowY = headerY + 20 + (index * 22);
       
@@ -681,31 +683,20 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       oiContainer.append("rect")
         .attr("x", 8)
         .attr("y", rowY - 10)
-        .attr("width", oiPanelWidth - 26)
+        .attr("width", panelWidth - 16)
         .attr("height", 20)
         .attr("fill", atmBg)
         .attr("rx", 2);
 
-      // Strike price with enhanced styling
-      oiContainer.append("text")
-        .attr("class", "oi-strike")
-        .attr("x", 40)
-        .attr("y", rowY)
-        .attr("text-anchor", "middle")
-        .attr("font-size", isATM ? "11px" : "10px")
-        .attr("font-weight", isATM ? "bold" : "normal")
-        .attr("fill", isATM ? "#f57c00" : "#495057")
-        .text(oi.strikePrice.toLocaleString());
-
-      // CE side (left)
+      // CE side (left in panel)
       const ceColor = isITM_CE ? "#1565c0" : "#42a5f5";
       
       // CE OI with background highlight for ITM
       if (isITM_CE) {
         oiContainer.append("rect")
-          .attr("x", 85)
+          .attr("x", panelWidth * 0.08)
           .attr("y", rowY - 8)
-          .attr("width", 50)
+          .attr("width", panelWidth * 0.14)
           .attr("height", 16)
           .attr("fill", "rgba(21, 101, 192, 0.1)")
           .attr("rx", 2);
@@ -713,7 +704,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
       oiContainer.append("text")
         .attr("class", "oi-ce")
-        .attr("x", 110)
+        .attr("x", panelWidth * 0.15)
         .attr("y", rowY)
         .attr("text-anchor", "middle")
         .attr("font-size", "9px")
@@ -725,17 +716,18 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       const ceChangeIcon = oi.ce.changeOI >= 0 ? "▲" : "▼";
       oiContainer.append("text")
         .attr("class", "oi-ce-change")
-        .attr("x", 145)
+        .attr("x", panelWidth * 0.25)
         .attr("y", rowY)
         .attr("text-anchor", "middle")
         .attr("font-size", "8px")
         .attr("fill", oi.ce.changeOI >= 0 ? "#4caf50" : "#f44336")
         .text(ceChangeIcon + formatChange(Math.abs(oi.ce.changeOI)));
 
-      // OI Bar Chart in center
-      const ceBarWidth = (oi.ce.oi / maxOI) * maxBarWidth;
-      const peBarWidth = (oi.pe.oi / maxOI) * maxBarWidth;
-      const centerX = 200;
+      // Histogram in center
+      const maxHistogramWidth = panelWidth * 0.2;
+      const ceBarWidth = (oi.ce.oi / maxOI) * maxHistogramWidth;
+      const peBarWidth = (oi.pe.oi / maxOI) * maxHistogramWidth;
+      const centerX = panelWidth * 0.5;
 
       // CE bar (left side of center)
       oiContainer.append("rect")
@@ -767,15 +759,15 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         .attr("stroke-width", 1)
         .attr("opacity", 0.5);
 
-      // PE side (right)
+      // PE side (right in panel)
       const peColor = isITM_PE ? "#c62828" : "#ef5350";
       
       // PE OI with background highlight for ITM
       if (isITM_PE) {
         oiContainer.append("rect")
-          .attr("x", 235)
+          .attr("x", panelWidth * 0.68)
           .attr("y", rowY - 8)
-          .attr("width", 50)
+          .attr("width", panelWidth * 0.14)
           .attr("height", 16)
           .attr("fill", "rgba(198, 40, 40, 0.1)")
           .attr("rx", 2);
@@ -783,7 +775,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
       oiContainer.append("text")
         .attr("class", "oi-pe")
-        .attr("x", 260)
+        .attr("x", panelWidth * 0.75)
         .attr("y", rowY)
         .attr("text-anchor", "middle")
         .attr("font-size", "9px")
@@ -795,39 +787,37 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       const peChangeIcon = oi.pe.changeOI >= 0 ? "▲" : "▼";
       oiContainer.append("text")
         .attr("class", "oi-pe-change")
-        .attr("x", 295)
+        .attr("x", panelWidth * 0.85)
         .attr("y", rowY)
         .attr("text-anchor", "middle")
         .attr("font-size", "8px")
         .attr("fill", oi.pe.changeOI >= 0 ? "#4caf50" : "#f44336")
         .text(peChangeIcon + formatChange(Math.abs(oi.pe.changeOI)));
 
-      // Strike price line extending to chart with enhanced styling
+      // Strike price with enhanced styling (rightmost)
+      oiContainer.append("text")
+        .attr("class", "oi-strike")
+        .attr("x", panelWidth * 0.95)
+        .attr("y", rowY)
+        .attr("text-anchor", "middle")
+        .attr("font-size", isATM ? "11px" : "10px")
+        .attr("font-weight", isATM ? "bold" : "normal")
+        .attr("fill", isATM ? "#f57c00" : "#495057")
+        .text(oi.strikePrice.toLocaleString());
+
+      // Strike price line extending from chart to OI panel
       const strikeY = yScale(oi.strikePrice);
       if (strikeY >= 0 && strikeY <= yScale.range()[0]) {
         g.append("line")
           .attr("class", "strike-line")
-          .attr("x1", -oiPanelWidth + 10)
-          .attr("x2", xScale.range()[1])
+          .attr("x1", xScale.range()[1])
+          .attr("x2", xScale.range()[1] + oiPanelWidth)
           .attr("y1", strikeY)
           .attr("y2", strikeY)
           .attr("stroke", isATM ? "#ff9800" : "#e0e0e0")
           .attr("stroke-width", isATM ? 2 : 0.5)
           .attr("stroke-dasharray", isATM ? "none" : "3,3")
           .attr("opacity", isATM ? 0.9 : 0.4);
-
-        // Strike price labels on the chart
-        if (isATM || index % 3 === 0) { // Show labels for ATM and every 3rd strike
-          g.append("text")
-            .attr("class", "strike-label")
-            .attr("x", xScale.range()[1] + 5)
-            .attr("y", strikeY)
-            .attr("dy", "0.35em")
-            .attr("font-size", "9px")
-            .attr("font-weight", isATM ? "bold" : "normal")
-            .attr("fill", isATM ? "#ff9800" : "#666")
-            .text(oi.strikePrice.toFixed(0));
-        }
       }
     });
 
@@ -835,21 +825,21 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     const currentPriceY = yScale(currentPrice);
     g.append("line")
       .attr("class", "current-price-line")
-      .attr("x1", -oiPanelWidth + 10)
-      .attr("x2", xScale.range()[1])
+      .attr("x1", xScale.range()[0])
+      .attr("x2", xScale.range()[1] + oiPanelWidth)
       .attr("y1", currentPriceY)
       .attr("y2", currentPriceY)
       .attr("stroke", "#ff5722")
       .attr("stroke-width", 3)
       .attr("opacity", 0.9);
 
-    // Current price label with shadow effect
+    // Current price label with shadow effect in OI panel
     const priceLabel = oiContainer.append("g")
       .attr("class", "current-price-label");
 
     // Shadow
     priceLabel.append("rect")
-      .attr("x", 12)
+      .attr("x", panelWidth * 0.85 - 35)
       .attr("y", currentPriceY - 8)
       .attr("width", 70)
       .attr("height", 18)
@@ -858,7 +848,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
     // Main label
     priceLabel.append("rect")
-      .attr("x", 10)
+      .attr("x", panelWidth * 0.85 - 37)
       .attr("y", currentPriceY - 10)
       .attr("width", 70)
       .attr("height", 18)
@@ -866,7 +856,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       .attr("rx", 4);
 
     priceLabel.append("text")
-      .attr("x", 45)
+      .attr("x", panelWidth * 0.85 - 2)
       .attr("y", currentPriceY)
       .attr("text-anchor", "middle")
       .attr("font-size", "10px")
@@ -886,48 +876,52 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     oiContainer.append("rect")
       .attr("x", 5)
       .attr("y", summaryY - 15)
-      .attr("width", oiPanelWidth - 20)
-      .attr("height", 35)
+      .attr("width", panelWidth - 10)
+      .attr("height", 50)
       .attr("fill", "#495057")
       .attr("rx", 4);
 
     // Summary labels
     oiContainer.append("text")
-      .attr("x", 15)
+      .attr("x", panelWidth * 0.15)
       .attr("y", summaryY - 2)
+      .attr("text-anchor", "middle")
       .attr("font-size", "9px")
       .attr("font-weight", "bold")
       .attr("fill", "white")
-      .text("Total CE OI: " + formatOI(totalCE_OI));
+      .text("CE: " + formatOI(totalCE_OI));
 
     oiContainer.append("text")
-      .attr("x", 15)
+      .attr("x", panelWidth * 0.15)
       .attr("y", summaryY + 10)
-      .attr("font-size", "9px")
+      .attr("text-anchor", "middle")
+      .attr("font-size", "8px")
       .attr("font-weight", "bold")
       .attr("fill", "white")
-      .text("Change: " + (totalCE_Change >= 0 ? "+" : "") + formatOI(totalCE_Change));
+      .text((totalCE_Change >= 0 ? "+" : "") + formatOI(totalCE_Change));
 
     oiContainer.append("text")
-      .attr("x", 160)
+      .attr("x", panelWidth * 0.75)
       .attr("y", summaryY - 2)
+      .attr("text-anchor", "middle")
       .attr("font-size", "9px")
       .attr("font-weight", "bold")
       .attr("fill", "white")
-      .text("Total PE OI: " + formatOI(totalPE_OI));
+      .text("PE: " + formatOI(totalPE_OI));
 
     oiContainer.append("text")
-      .attr("x", 160)
+      .attr("x", panelWidth * 0.75)
       .attr("y", summaryY + 10)
-      .attr("font-size", "9px")
+      .attr("text-anchor", "middle")
+      .attr("font-size", "8px")
       .attr("font-weight", "bold")
       .attr("fill", "white")
-      .text("Change: " + (totalPE_Change >= 0 ? "+" : "") + formatOI(totalPE_Change));
+      .text((totalPE_Change >= 0 ? "+" : "") + formatOI(totalPE_Change));
 
     // PCR (Put Call Ratio)
     const pcr = totalPE_OI / totalCE_OI;
     oiContainer.append("text")
-      .attr("x", oiPanelWidth / 2)
+      .attr("x", panelWidth * 0.5)
       .attr("y", summaryY + 25)
       .attr("text-anchor", "middle")
       .attr("font-size", "10px")
@@ -957,16 +951,18 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       .attr("transform", `translate(0,${height * 0.7})`)
       .call(d3.axisBottom(xScale).tickFormat(d3.timeFormat("%m/%d")));
 
-    // Left Y-axis (for prices and strikes)
-    g.append("g")
-      .attr("class", "axis y-axis")
-      .call(d3.axisLeft(yScale));
+    // Left Y-axis (minimal or hidden when OI is shown)
+    if (!config.showOI) {
+      g.append("g")
+        .attr("class", "axis y-axis")
+        .call(d3.axisLeft(yScale));
+    }
 
-    // Right Y-axis
+    // Right Y-axis (main price axis)
     g.append("g")
       .attr("class", "axis y-axis-right")
       .attr("transform", `translate(${width},0)`)
-      .call(d3.axisRight(yScale));
+      .call(d3.axisRight(yScale).tickFormat(d => d3.format(".0f")(d)));
   };
 
   const renderDrawings = (g: any, xScale: any, yScale: any) => {
