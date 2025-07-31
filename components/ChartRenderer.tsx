@@ -32,7 +32,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   const renderChart = () => {
     if (!chartRef.current || !svgRef.current) return;
 
-    const oiPanelWidth = config.showOI ? 300 : 0;
+    const oiPanelWidth = config.showOI ? 350 : 0;
     const margin = { top: 20, right: 220, bottom: 50, left: 50 + oiPanelWidth };
     const width = chartRef.current.clientWidth - margin.left - margin.right;
     const height = chartRef.current.clientHeight - margin.top - margin.bottom;
@@ -591,26 +591,54 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       .attr("class", "oi-container")
       .attr("transform", `translate(${-oiPanelWidth}, 0)`);
 
-    // OI Panel Background
+    // OI Panel Background with gradient
+    const defs = oiContainer.append("defs");
+    const gradient = defs.append("linearGradient")
+      .attr("id", "oi-background-gradient")
+      .attr("x1", "0%")
+      .attr("y1", "0%")
+      .attr("x2", "100%")
+      .attr("y2", "0%");
+
+    gradient.append("stop")
+      .attr("offset", "0%")
+      .attr("stop-color", "#f8f9fa")
+      .attr("stop-opacity", 0.98);
+
+    gradient.append("stop")
+      .attr("offset", "100%")
+      .attr("stop-color", "#ffffff")
+      .attr("stop-opacity", 0.95);
+
     oiContainer.append("rect")
       .attr("class", "oi-background")
       .attr("x", 0)
       .attr("y", 0)
       .attr("width", oiPanelWidth - 10)
       .attr("height", yScale.range()[0])
-      .attr("fill", "rgba(248, 249, 250, 0.95)")
+      .attr("fill", "url(#oi-background-gradient)")
       .attr("stroke", "#e9ecef")
       .attr("stroke-width", 1);
 
-    // Headers
-    const headerY = 20;
+    // Headers with better styling
+    const headerY = 25;
     const headers = [
-      { text: "Strike", x: 30, align: "middle" },
-      { text: "CE OI", x: 90, align: "middle" },
-      { text: "Change", x: 130, align: "middle" },
-      { text: "PE OI", x: 190, align: "middle" },
-      { text: "Change", x: 230, align: "middle" }
+      { text: "Strike", x: 40, align: "middle", width: 60 },
+      { text: "CE OI", x: 110, align: "middle", width: 50 },
+      { text: "Chg", x: 145, align: "middle", width: 35 },
+      { text: "OI Chart", x: 200, align: "middle", width: 80 },
+      { text: "PE OI", x: 260, align: "middle", width: 50 },
+      { text: "Chg", x: 295, align: "middle", width: 35 }
     ];
+
+    // Header background
+    oiContainer.append("rect")
+      .attr("x", 5)
+      .attr("y", 5)
+      .attr("width", oiPanelWidth - 20)
+      .attr("height", 30)
+      .attr("fill", "#6c757d")
+      .attr("rx", 4);
 
     headers.forEach(header => {
       oiContainer.append("text")
@@ -618,117 +646,192 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         .attr("x", header.x)
         .attr("y", headerY)
         .attr("text-anchor", header.align)
-        .attr("font-size", "11px")
+        .attr("font-size", "10px")
         .attr("font-weight", "bold")
-        .attr("fill", "#495057")
+        .attr("fill", "white")
         .text(header.text);
     });
 
-    // Draw separator line
-    oiContainer.append("line")
-      .attr("x1", 10)
-      .attr("x2", oiPanelWidth - 20)
-      .attr("y1", headerY + 10)
-      .attr("y2", headerY + 10)
-      .attr("stroke", "#dee2e6")
-      .attr("stroke-width", 1);
-
-    // Current price line for reference
+    // Current price for reference
     const currentPrice = data.length > 0 ? data[data.length - 1].close : 50000;
 
     // Filter and sort OI data by strike price
     const visibleOI = oiData
-      .filter(oi => Math.abs(oi.strikePrice - currentPrice) <= currentPrice * 0.1) // Show strikes within 10% of current price
+      .filter(oi => Math.abs(oi.strikePrice - currentPrice) <= currentPrice * 0.15) // Show strikes within 15% of current price
       .sort((a, b) => b.strikePrice - a.strikePrice);
 
-    // Render OI data rows
+    // Calculate max OI for scaling bars
+    const maxOI = Math.max(...visibleOI.map(oi => Math.max(oi.ce.oi, oi.pe.oi)));
+    const maxBarWidth = 35;
+
+    // Render OI data rows with enhanced visuals
     visibleOI.forEach((oi, index) => {
-      const rowY = headerY + 30 + (index * 18);
+      const rowY = headerY + 20 + (index * 22);
       
-      if (rowY > yScale.range()[0] - 20) return; // Don't render if out of bounds
+      if (rowY > yScale.range()[0] - 25) return; // Don't render if out of bounds
 
-      const isNearMoney = Math.abs(oi.strikePrice - currentPrice) <= 1000;
-      const rowBg = isNearMoney ? "rgba(255, 235, 59, 0.1)" : "transparent";
+      const isATM = Math.abs(oi.strikePrice - currentPrice) <= 500; // At the money
+      const isITM_CE = oi.strikePrice < currentPrice; // In the money for CE
+      const isITM_PE = oi.strikePrice > currentPrice; // In the money for PE
+      
+      // Row background with alternating colors
+      const rowBg = index % 2 === 0 ? "rgba(248, 249, 250, 0.5)" : "rgba(255, 255, 255, 0.3)";
+      const atmBg = isATM ? "rgba(255, 193, 7, 0.15)" : rowBg;
 
-      // Row background for near money strikes
-      if (isNearMoney) {
+      oiContainer.append("rect")
+        .attr("x", 8)
+        .attr("y", rowY - 10)
+        .attr("width", oiPanelWidth - 26)
+        .attr("height", 20)
+        .attr("fill", atmBg)
+        .attr("rx", 2);
+
+      // Strike price with enhanced styling
+      oiContainer.append("text")
+        .attr("class", "oi-strike")
+        .attr("x", 40)
+        .attr("y", rowY)
+        .attr("text-anchor", "middle")
+        .attr("font-size", isATM ? "11px" : "10px")
+        .attr("font-weight", isATM ? "bold" : "normal")
+        .attr("fill", isATM ? "#f57c00" : "#495057")
+        .text(oi.strikePrice.toLocaleString());
+
+      // CE side (left)
+      const ceColor = isITM_CE ? "#1565c0" : "#42a5f5";
+      
+      // CE OI with background highlight for ITM
+      if (isITM_CE) {
         oiContainer.append("rect")
-          .attr("x", 10)
+          .attr("x", 85)
           .attr("y", rowY - 8)
-          .attr("width", oiPanelWidth - 30)
+          .attr("width", 50)
           .attr("height", 16)
-          .attr("fill", rowBg)
+          .attr("fill", "rgba(21, 101, 192, 0.1)")
           .attr("rx", 2);
       }
 
-      // Strike price (left side, aligned with price axis)
-      oiContainer.append("text")
-        .attr("class", "oi-strike")
-        .attr("x", 30)
-        .attr("y", rowY)
-        .attr("text-anchor", "middle")
-        .attr("font-size", "10px")
-        .attr("font-weight", isNearMoney ? "bold" : "normal")
-        .attr("fill", isNearMoney ? "#f57c00" : "#666")
-        .text(oi.strikePrice.toLocaleString());
-
-      // CE OI
       oiContainer.append("text")
         .attr("class", "oi-ce")
-        .attr("x", 90)
+        .attr("x", 110)
         .attr("y", rowY)
         .attr("text-anchor", "middle")
         .attr("font-size", "9px")
-        .attr("fill", "#1976d2")
+        .attr("font-weight", isITM_CE ? "bold" : "normal")
+        .attr("fill", ceColor)
         .text(formatOI(oi.ce.oi));
 
-      // CE Change
+      // CE Change with arrows
+      const ceChangeIcon = oi.ce.changeOI >= 0 ? "▲" : "▼";
       oiContainer.append("text")
         .attr("class", "oi-ce-change")
-        .attr("x", 130)
+        .attr("x", 145)
         .attr("y", rowY)
         .attr("text-anchor", "middle")
-        .attr("font-size", "9px")
+        .attr("font-size", "8px")
         .attr("fill", oi.ce.changeOI >= 0 ? "#4caf50" : "#f44336")
-        .text(formatChange(oi.ce.changeOI));
+        .text(ceChangeIcon + formatChange(Math.abs(oi.ce.changeOI)));
 
-      // PE OI
+      // OI Bar Chart in center
+      const ceBarWidth = (oi.ce.oi / maxOI) * maxBarWidth;
+      const peBarWidth = (oi.pe.oi / maxOI) * maxBarWidth;
+      const centerX = 200;
+
+      // CE bar (left side of center)
+      oiContainer.append("rect")
+        .attr("x", centerX - ceBarWidth)
+        .attr("y", rowY - 6)
+        .attr("width", ceBarWidth)
+        .attr("height", 12)
+        .attr("fill", ceColor)
+        .attr("opacity", 0.7)
+        .attr("rx", 1);
+
+      // PE bar (right side of center)
+      oiContainer.append("rect")
+        .attr("x", centerX)
+        .attr("y", rowY - 6)
+        .attr("width", peBarWidth)
+        .attr("height", 12)
+        .attr("fill", "#d32f2f")
+        .attr("opacity", 0.7)
+        .attr("rx", 1);
+
+      // Center line
+      oiContainer.append("line")
+        .attr("x1", centerX)
+        .attr("x2", centerX)
+        .attr("y1", rowY - 8)
+        .attr("y2", rowY + 8)
+        .attr("stroke", "#666")
+        .attr("stroke-width", 1)
+        .attr("opacity", 0.5);
+
+      // PE side (right)
+      const peColor = isITM_PE ? "#c62828" : "#ef5350";
+      
+      // PE OI with background highlight for ITM
+      if (isITM_PE) {
+        oiContainer.append("rect")
+          .attr("x", 235)
+          .attr("y", rowY - 8)
+          .attr("width", 50)
+          .attr("height", 16)
+          .attr("fill", "rgba(198, 40, 40, 0.1)")
+          .attr("rx", 2);
+      }
+
       oiContainer.append("text")
         .attr("class", "oi-pe")
-        .attr("x", 190)
+        .attr("x", 260)
         .attr("y", rowY)
         .attr("text-anchor", "middle")
         .attr("font-size", "9px")
-        .attr("fill", "#d32f2f")
+        .attr("font-weight", isITM_PE ? "bold" : "normal")
+        .attr("fill", peColor)
         .text(formatOI(oi.pe.oi));
 
-      // PE Change
+      // PE Change with arrows
+      const peChangeIcon = oi.pe.changeOI >= 0 ? "▲" : "▼";
       oiContainer.append("text")
         .attr("class", "oi-pe-change")
-        .attr("x", 230)
+        .attr("x", 295)
         .attr("y", rowY)
         .attr("text-anchor", "middle")
-        .attr("font-size", "9px")
+        .attr("font-size", "8px")
         .attr("fill", oi.pe.changeOI >= 0 ? "#4caf50" : "#f44336")
-        .text(formatChange(oi.pe.changeOI));
+        .text(peChangeIcon + formatChange(Math.abs(oi.pe.changeOI)));
 
-      // Strike price line extending to chart
+      // Strike price line extending to chart with enhanced styling
       const strikeY = yScale(oi.strikePrice);
       if (strikeY >= 0 && strikeY <= yScale.range()[0]) {
         g.append("line")
           .attr("class", "strike-line")
           .attr("x1", -oiPanelWidth + 10)
-          .attr("x2", 0)
+          .attr("x2", xScale.range()[1])
           .attr("y1", strikeY)
           .attr("y2", strikeY)
-          .attr("stroke", isNearMoney ? "#ff9800" : "#e0e0e0")
-          .attr("stroke-width", isNearMoney ? 1.5 : 0.5)
-          .attr("stroke-dasharray", isNearMoney ? "none" : "2,2")
-          .attr("opacity", 0.7);
+          .attr("stroke", isATM ? "#ff9800" : "#e0e0e0")
+          .attr("stroke-width", isATM ? 2 : 0.5)
+          .attr("stroke-dasharray", isATM ? "none" : "3,3")
+          .attr("opacity", isATM ? 0.9 : 0.4);
+
+        // Strike price labels on the chart
+        if (isATM || index % 3 === 0) { // Show labels for ATM and every 3rd strike
+          g.append("text")
+            .attr("class", "strike-label")
+            .attr("x", xScale.range()[1] + 5)
+            .attr("y", strikeY)
+            .attr("dy", "0.35em")
+            .attr("font-size", "9px")
+            .attr("font-weight", isATM ? "bold" : "normal")
+            .attr("fill", isATM ? "#ff9800" : "#666")
+            .text(oi.strikePrice.toFixed(0));
+        }
       }
     });
 
-    // Current price indicator line
+    // Current price indicator line with enhanced styling
     const currentPriceY = yScale(currentPrice);
     g.append("line")
       .attr("class", "current-price-line")
@@ -737,26 +840,100 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       .attr("y1", currentPriceY)
       .attr("y2", currentPriceY)
       .attr("stroke", "#ff5722")
-      .attr("stroke-width", 2)
-      .attr("opacity", 0.8);
+      .attr("stroke-width", 3)
+      .attr("opacity", 0.9);
 
-    // Current price label
-    oiContainer.append("rect")
+    // Current price label with shadow effect
+    const priceLabel = oiContainer.append("g")
+      .attr("class", "current-price-label");
+
+    // Shadow
+    priceLabel.append("rect")
+      .attr("x", 12)
+      .attr("y", currentPriceY - 8)
+      .attr("width", 70)
+      .attr("height", 18)
+      .attr("fill", "rgba(0, 0, 0, 0.2)")
+      .attr("rx", 4);
+
+    // Main label
+    priceLabel.append("rect")
       .attr("x", 10)
       .attr("y", currentPriceY - 10)
-      .attr("width", 60)
-      .attr("height", 20)
+      .attr("width", 70)
+      .attr("height", 18)
       .attr("fill", "#ff5722")
-      .attr("rx", 3);
+      .attr("rx", 4);
 
-    oiContainer.append("text")
-      .attr("x", 40)
-      .attr("y", currentPriceY + 4)
+    priceLabel.append("text")
+      .attr("x", 45)
+      .attr("y", currentPriceY)
       .attr("text-anchor", "middle")
       .attr("font-size", "10px")
       .attr("font-weight", "bold")
       .attr("fill", "white")
       .text(currentPrice.toFixed(0));
+
+    // Total OI summary at bottom
+    const totalCE_OI = visibleOI.reduce((sum, oi) => sum + oi.ce.oi, 0);
+    const totalPE_OI = visibleOI.reduce((sum, oi) => sum + oi.pe.oi, 0);
+    const totalCE_Change = visibleOI.reduce((sum, oi) => sum + oi.ce.changeOI, 0);
+    const totalPE_Change = visibleOI.reduce((sum, oi) => sum + oi.pe.changeOI, 0);
+
+    const summaryY = yScale.range()[0] - 40;
+    
+    // Summary background
+    oiContainer.append("rect")
+      .attr("x", 5)
+      .attr("y", summaryY - 15)
+      .attr("width", oiPanelWidth - 20)
+      .attr("height", 35)
+      .attr("fill", "#495057")
+      .attr("rx", 4);
+
+    // Summary labels
+    oiContainer.append("text")
+      .attr("x", 15)
+      .attr("y", summaryY - 2)
+      .attr("font-size", "9px")
+      .attr("font-weight", "bold")
+      .attr("fill", "white")
+      .text("Total CE OI: " + formatOI(totalCE_OI));
+
+    oiContainer.append("text")
+      .attr("x", 15)
+      .attr("y", summaryY + 10)
+      .attr("font-size", "9px")
+      .attr("font-weight", "bold")
+      .attr("fill", "white")
+      .text("Change: " + (totalCE_Change >= 0 ? "+" : "") + formatOI(totalCE_Change));
+
+    oiContainer.append("text")
+      .attr("x", 160)
+      .attr("y", summaryY - 2)
+      .attr("font-size", "9px")
+      .attr("font-weight", "bold")
+      .attr("fill", "white")
+      .text("Total PE OI: " + formatOI(totalPE_OI));
+
+    oiContainer.append("text")
+      .attr("x", 160)
+      .attr("y", summaryY + 10)
+      .attr("font-size", "9px")
+      .attr("font-weight", "bold")
+      .attr("fill", "white")
+      .text("Change: " + (totalPE_Change >= 0 ? "+" : "") + formatOI(totalPE_Change));
+
+    // PCR (Put Call Ratio)
+    const pcr = totalPE_OI / totalCE_OI;
+    oiContainer.append("text")
+      .attr("x", oiPanelWidth / 2)
+      .attr("y", summaryY + 25)
+      .attr("text-anchor", "middle")
+      .attr("font-size", "10px")
+      .attr("font-weight", "bold")
+      .attr("fill", pcr > 1.2 ? "#4caf50" : pcr < 0.8 ? "#f44336" : "#ff9800")
+      .text(`PCR: ${pcr.toFixed(2)}`);
   };
 
   const formatOI = (value: number): string => {

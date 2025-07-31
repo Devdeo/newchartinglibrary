@@ -95,27 +95,43 @@ const TradingChart: React.FC = () => {
 
   const generateOIData = (): OIData[] => {
     const oiData: OIData[] = [];
-    const basePrice = 50000;
-    const strikeGap = 500;
+    const currentPrice = data.length > 0 ? data[data.length - 1].close : 50000;
+    const strikeGap = 100;
     
-    // Generate strikes from -20% to +20% of base price
-    for (let i = -20; i <= 20; i++) {
-      const strikePrice = basePrice + (i * strikeGap);
+    // Generate strikes from -15% to +15% of current price
+    for (let i = -30; i <= 30; i++) {
+      const strikePrice = Math.round((currentPrice + (i * strikeGap)) / 100) * 100; // Round to nearest 100
+      const distanceFromMoney = Math.abs(strikePrice - currentPrice);
+      
+      // Higher OI for strikes closer to current price
+      const baseOI = Math.max(1000, 15000 - (distanceFromMoney / 100) * 300);
+      const oiVariation = 0.3; // 30% variation
+      
+      // CE tends to have higher OI for OTM (strikes above current price)
+      const ceMultiplier = strikePrice > currentPrice ? 1.2 : 0.8;
+      // PE tends to have higher OI for OTM (strikes below current price)  
+      const peMultiplier = strikePrice < currentPrice ? 1.2 : 0.8;
+      
+      const ceOI = Math.floor((baseOI * ceMultiplier) * (1 + (Math.random() - 0.5) * oiVariation));
+      const peOI = Math.floor((baseOI * peMultiplier) * (1 + (Math.random() - 0.5) * oiVariation));
+      
+      // Changes tend to be smaller for ATM strikes
+      const changeVariation = Math.min(2000, distanceFromMoney / 10);
       
       oiData.push({
         strikePrice,
         ce: {
-          oi: Math.floor(Math.random() * 10000) + 1000,
-          changeOI: Math.floor((Math.random() - 0.5) * 2000)
+          oi: Math.max(500, ceOI),
+          changeOI: Math.floor((Math.random() - 0.5) * changeVariation)
         },
         pe: {
-          oi: Math.floor(Math.random() * 10000) + 1000,
-          changeOI: Math.floor((Math.random() - 0.5) * 2000)
+          oi: Math.max(500, peOI),
+          changeOI: Math.floor((Math.random() - 0.5) * changeVariation)
         }
       });
     }
     
-    return oiData;
+    return oiData.sort((a, b) => a.strikePrice - b.strikePrice);
   };
 
   return (
