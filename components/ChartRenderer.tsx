@@ -249,22 +249,26 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   };
 
   const renderIndicators = (g: any, xScale: any, yScale: any) => {
+    const indicatorConfig = config.indicatorConfig || {};
+    
     config.indicators.forEach(indicator => {
+      const userConfig = indicatorConfig[indicator] || {};
+      
       switch (indicator) {
         case 'SMA':
-          renderSMA(g, xScale, yScale, 20);
+          renderSMA(g, xScale, yScale, userConfig.period || 20);
           break;
         case 'EMA':
-          renderEMA(g, xScale, yScale, 20);
+          renderEMA(g, xScale, yScale, userConfig.period || 20);
           break;
         case 'MACD':
-          renderMACD(g, xScale, yScale);
+          renderMACD(g, xScale, yScale, userConfig);
           break;
         case 'RSI':
-          renderRSI(g, xScale, yScale);
+          renderRSI(g, xScale, yScale, userConfig.period || 14);
           break;
         case 'BB':
-          renderBollingerBands(g, xScale, yScale, 20, 2);
+          renderBollingerBands(g, xScale, yScale, userConfig.period || 20, userConfig.stdDev || 2);
           break;
       }
     });
@@ -344,13 +348,17 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     }
   };
 
-  const renderMACD = (g: any, xScale: any, yScale: any) => {
+  const renderMACD = (g: any, xScale: any, yScale: any, userConfig: any = {}) => {
     const closes = data.map(d => d.close);
+    const fastPeriod = userConfig.fastPeriod || 12;
+    const slowPeriod = userConfig.slowPeriod || 26;
+    const signalPeriod = userConfig.signalPeriod || 9;
+    
     const macdValues = TI.MACD.calculate({
       values: closes,
-      fastPeriod: 12,
-      slowPeriod: 26,
-      signalPeriod: 9,
+      fastPeriod,
+      slowPeriod,
+      signalPeriod,
       SimpleMAOscillator: false,
       SimpleMASignal: false
     });
@@ -366,7 +374,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       .domain([-macdExtent[1], macdExtent[1]])
       .range([macdY + macdHeight, macdY]);
 
-    const macdData = data.slice(26).map((d, i) => ({
+    const macdData = data.slice(slowPeriod).map((d, i) => ({
       date: d.date,
       macd: macdValues[i]?.MACD || 0,
       signal: macdValues[i]?.signal || 0,
@@ -427,9 +435,9 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       .attr("stroke-dasharray", "2,2");
   };
 
-  const renderRSI = (g: any, xScale: any, yScale: any) => {
+  const renderRSI = (g: any, xScale: any, yScale: any, period: number = 14) => {
     const closes = data.map(d => d.close);
-    const rsiValues = TI.RSI.calculate({ period: 14, values: closes });
+    const rsiValues = TI.RSI.calculate({ period, values: closes });
     
     if (rsiValues.length === 0) return;
 
@@ -441,7 +449,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       .domain([0, 100])
       .range([rsiY + rsiHeight, rsiY]);
 
-    const rsiData = data.slice(14).map((d, i) => ({
+    const rsiData = data.slice(period).map((d, i) => ({
       date: d.date,
       value: rsiValues[i] || 50
     }));

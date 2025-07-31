@@ -20,6 +20,11 @@ export interface ChartConfig {
   indicators: string[];
   timeframe: string;
   symbol: string;
+  indicatorConfig?: {
+    [key: string]: {
+      [param: string]: number;
+    };
+  };
 }
 
 const TradingChart: React.FC = () => {
