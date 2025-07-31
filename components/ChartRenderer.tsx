@@ -620,7 +620,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     // Render histogram bars for each strike price
     visibleOI.forEach(oi => {
       const strikeY = yScale(oi.strikePrice);
-      const barHeight = 8; // Height of each individual bar
+      const barHeight = 6; // Height of each individual bar
       const barGap = 1; // Gap between bars
 
       // Calculate bar widths based on values
@@ -629,12 +629,12 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       const ceChangeWidth = Math.abs(oi.ce.changeOI) / maxCE_Change * maxBarWidth * 0.6; // Smaller scale for changes
       const peChangeWidth = Math.abs(oi.pe.changeOI) / maxPE_Change * maxBarWidth * 0.6;
 
-      // Stack bars vertically at each strike price
-      // CE OI (Red) - Top bar
+      // Position bars around strike price: 2 above, strike in middle, 2 below
+      // CE OI (Red) - Top bar (2 positions above strike)
       oiOverlay.append("rect")
         .attr("class", "oi-histogram ce-oi")
         .attr("x", baseX)
-        .attr("y", strikeY - (barHeight * 2) - (barGap * 2))
+        .attr("y", strikeY - (barHeight + barGap) * 2)
         .attr("width", ceOIWidth)
         .attr("height", barHeight)
         .attr("fill", "#ef5350")
@@ -642,24 +642,12 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         .append("title")
         .text(`CE OI: ${formatOI(oi.ce.oi)} @ ${oi.strikePrice}`);
 
-      // PE OI (Green) - Second bar
-      oiOverlay.append("rect")
-        .attr("class", "oi-histogram pe-oi")
-        .attr("x", baseX)
-        .attr("y", strikeY - barHeight - barGap)
-        .attr("width", peOIWidth)
-        .attr("height", barHeight)
-        .attr("fill", "#66bb6a")
-        .attr("opacity", 0.8)
-        .append("title")
-        .text(`PE OI: ${formatOI(oi.pe.oi)} @ ${oi.strikePrice}`);
-
-      // CE Change (Yellow) - Third bar
+      // CE Change (Yellow) - Second bar (1 position above strike)
       const ceChangeColor = oi.ce.changeOI >= 0 ? "#ffeb3b" : "#ffc107";
       oiOverlay.append("rect")
         .attr("class", "oi-histogram ce-change")
         .attr("x", baseX)
-        .attr("y", strikeY)
+        .attr("y", strikeY - (barHeight + barGap))
         .attr("width", ceChangeWidth)
         .attr("height", barHeight)
         .attr("fill", ceChangeColor)
@@ -667,31 +655,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         .append("title")
         .text(`CE Change: ${oi.ce.changeOI >= 0 ? '+' : ''}${formatOI(oi.ce.changeOI)} @ ${oi.strikePrice}`);
 
-      // PE Change (Blue) - Bottom bar
-      const peChangeColor = oi.pe.changeOI >= 0 ? "#42a5f5" : "#1976d2";
-      oiOverlay.append("rect")
-        .attr("class", "oi-histogram pe-change")
-        .attr("x", baseX)
-        .attr("y", strikeY + barHeight + barGap)
-        .attr("width", peChangeWidth)
-        .attr("height", barHeight)
-        .attr("fill", peChangeColor)
-        .attr("opacity", 0.8)
-        .append("title")
-        .text(`PE Change: ${oi.pe.changeOI >= 0 ? '+' : ''}${formatOI(oi.pe.changeOI)} @ ${oi.strikePrice}`);
-
-      // Strike price label at the right edge
-      oiOverlay.append("text")
-        .attr("class", "oi-strike-label")
-        .attr("x", baseX + maxBarWidth + 5)
-        .attr("y", strikeY)
-        .attr("dy", "0.35em")
-        .attr("font-size", "9px")
-        .attr("font-weight", Math.abs(oi.strikePrice - currentPrice) <= 100 ? "bold" : "normal")
-        .attr("fill", Math.abs(oi.strikePrice - currentPrice) <= 100 ? "#ff9800" : "#666")
-        .text(oi.strikePrice.toLocaleString());
-
-      // Light strike price line
+      // Strike price line and label at center
       oiOverlay.append("line")
         .attr("class", "strike-reference-line")
         .attr("x1", xScale.range()[0])
@@ -702,6 +666,42 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         .attr("stroke-width", Math.abs(oi.strikePrice - currentPrice) <= 100 ? 1.5 : 0.5)
         .attr("stroke-dasharray", "2,2")
         .attr("opacity", 0.3);
+
+      // Strike price label at the right edge (centered on strike price)
+      oiOverlay.append("text")
+        .attr("class", "oi-strike-label")
+        .attr("x", baseX + maxBarWidth + 5)
+        .attr("y", strikeY)
+        .attr("dy", "0.35em")
+        .attr("font-size", "9px")
+        .attr("font-weight", Math.abs(oi.strikePrice - currentPrice) <= 100 ? "bold" : "normal")
+        .attr("fill", Math.abs(oi.strikePrice - currentPrice) <= 100 ? "#ff9800" : "#666")
+        .text(oi.strikePrice.toLocaleString());
+
+      // PE Change (Blue) - Third bar (1 position below strike)
+      const peChangeColor = oi.pe.changeOI >= 0 ? "#42a5f5" : "#1976d2";
+      oiOverlay.append("rect")
+        .attr("class", "oi-histogram pe-change")
+        .attr("x", baseX)
+        .attr("y", strikeY + barGap)
+        .attr("width", peChangeWidth)
+        .attr("height", barHeight)
+        .attr("fill", peChangeColor)
+        .attr("opacity", 0.8)
+        .append("title")
+        .text(`PE Change: ${oi.pe.changeOI >= 0 ? '+' : ''}${formatOI(oi.pe.changeOI)} @ ${oi.strikePrice}`);
+
+      // PE OI (Green) - Bottom bar (2 positions below strike)
+      oiOverlay.append("rect")
+        .attr("class", "oi-histogram pe-oi")
+        .attr("x", baseX)
+        .attr("y", strikeY + (barHeight + barGap) + barGap)
+        .attr("width", peOIWidth)
+        .attr("height", barHeight)
+        .attr("fill", "#66bb6a")
+        .attr("opacity", 0.8)
+        .append("title")
+        .text(`PE OI: ${formatOI(oi.pe.oi)} @ ${oi.strikePrice}`);
     });
 
     // Current price indicator line
@@ -740,9 +740,9 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     const legendY = 10;
     const legendItems = [
       { color: "#ef5350", label: "CE OI", y: 0 },
-      { color: "#66bb6a", label: "PE OI", y: 15 },
-      { color: "#ffeb3b", label: "CE Chg", y: 30 },
-      { color: "#42a5f5", label: "PE Chg", y: 45 }
+      { color: "#ffeb3b", label: "CE Chg", y: 15 },
+      { color: "#42a5f5", label: "PE Chg", y: 30 },
+      { color: "#66bb6a", label: "PE OI", y: 45 }
     ];
 
     const legend = oiOverlay.append("g")
