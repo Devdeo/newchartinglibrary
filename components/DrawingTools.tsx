@@ -27,16 +27,17 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ drawingMode, setDrawingMode
     <div style={{
       position: 'absolute',
       top: '60px',
-      left: '10px',
+      right: '10px',
       backgroundColor: 'white',
       border: '1px solid #ddd',
       borderRadius: '8px',
       padding: '10px',
       boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-      zIndex: 1000
+      zIndex: 1000,
+      width: '200px'
     }}>
       <h4 style={{ margin: '0 0 10px 0', fontSize: '14px' }}>Drawing Tools</h4>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '5px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '5px' }}>
         {tools.map(tool => (
           <button
             key={tool.value}
@@ -50,10 +51,11 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ drawingMode, setDrawingMode
               cursor: 'pointer',
               fontSize: '12px',
               display: 'flex',
-              flexDirection: 'column',
+              flexDirection: 'row',
               alignItems: 'center',
-              gap: '2px',
-              minWidth: '80px'
+              gap: '8px',
+              width: '100%',
+              textAlign: 'left'
             }}
             title={tool.label}
           >

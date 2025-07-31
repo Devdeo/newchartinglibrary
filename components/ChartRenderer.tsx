@@ -30,7 +30,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   const renderChart = () => {
     if (!chartRef.current || !svgRef.current) return;
 
-    const margin = { top: 20, right: 50, bottom: 50, left: 50 };
+    const margin = { top: 20, right: 220, bottom: 50, left: 50 };
     const width = chartRef.current.clientWidth - margin.left - margin.right;
     const height = chartRef.current.clientHeight - margin.top - margin.bottom;
 
@@ -291,6 +291,20 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       .attr("stroke", "#FF9800")
       .attr("stroke-width", 2)
       .attr("d", line);
+
+    // Add current value label
+    if (smaData.length > 0) {
+      const lastValue = smaData[smaData.length - 1];
+      g.append("text")
+        .attr("class", "indicator sma-label")
+        .attr("x", xScale.range()[1] + 5)
+        .attr("y", yScale(lastValue.value))
+        .attr("dy", "0.35em")
+        .attr("fill", "#FF9800")
+        .attr("font-size", "12px")
+        .attr("font-weight", "bold")
+        .text(`SMA(${period}): ${lastValue.value.toFixed(2)}`);
+    }
   };
 
   const renderEMA = (g: any, xScale: any, yScale: any, period: number) => {
@@ -314,6 +328,20 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       .attr("stroke", "#9C27B0")
       .attr("stroke-width", 2)
       .attr("d", line);
+
+    // Add current value label
+    if (emaData.length > 0) {
+      const lastValue = emaData[emaData.length - 1];
+      g.append("text")
+        .attr("class", "indicator ema-label")
+        .attr("x", xScale.range()[1] + 5)
+        .attr("y", yScale(lastValue.value))
+        .attr("dy", "0.35em")
+        .attr("fill", "#9C27B0")
+        .attr("font-size", "12px")
+        .attr("font-weight", "bold")
+        .text(`EMA(${period}): ${lastValue.value.toFixed(2)}`);
+    }
   };
 
   const renderMACD = (g: any, xScale: any, yScale: any) => {
@@ -327,16 +355,148 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       SimpleMASignal: false
     });
 
-    // This would need a separate scale for MACD values
-    // Implementation would require additional panel
+    if (macdValues.length === 0) return;
+
+    // Create MACD panel at bottom
+    const macdHeight = 100;
+    const macdY = yScale.range()[0] + 50;
+    
+    const macdExtent = d3.extent(macdValues, (d: any) => Math.max(Math.abs(d.MACD || 0), Math.abs(d.signal || 0), Math.abs(d.histogram || 0)));
+    const macdScale = d3.scaleLinear()
+      .domain([-macdExtent[1], macdExtent[1]])
+      .range([macdY + macdHeight, macdY]);
+
+    const macdData = data.slice(26).map((d, i) => ({
+      date: d.date,
+      macd: macdValues[i]?.MACD || 0,
+      signal: macdValues[i]?.signal || 0,
+      histogram: macdValues[i]?.histogram || 0
+    }));
+
+    // MACD line
+    const macdLine = d3.line<any>()
+      .x(d => xScale(d.date))
+      .y(d => macdScale(d.macd))
+      .curve(d3.curveMonotoneX);
+
+    g.append("path")
+      .datum(macdData)
+      .attr("class", "indicator macd-line")
+      .attr("fill", "none")
+      .attr("stroke", "#2196F3")
+      .attr("stroke-width", 2)
+      .attr("d", macdLine);
+
+    // Signal line
+    const signalLine = d3.line<any>()
+      .x(d => xScale(d.date))
+      .y(d => macdScale(d.signal))
+      .curve(d3.curveMonotoneX);
+
+    g.append("path")
+      .datum(macdData)
+      .attr("class", "indicator macd-signal")
+      .attr("fill", "none")
+      .attr("stroke", "#FF9800")
+      .attr("stroke-width", 2)
+      .attr("d", signalLine);
+
+    // Histogram bars
+    const barWidth = Math.max(1, (xScale.range()[1] - xScale.range()[0]) / macdData.length * 0.8);
+    
+    g.selectAll(".macd-histogram")
+      .data(macdData)
+      .enter()
+      .append("rect")
+      .attr("class", "indicator macd-histogram")
+      .attr("x", d => xScale(d.date) - barWidth / 2)
+      .attr("y", d => d.histogram >= 0 ? macdScale(d.histogram) : macdScale(0))
+      .attr("width", barWidth)
+      .attr("height", d => Math.abs(macdScale(d.histogram) - macdScale(0)))
+      .attr("fill", d => d.histogram >= 0 ? "rgba(76, 175, 80, 0.7)" : "rgba(244, 67, 54, 0.7)");
+
+    // MACD zero line
+    g.append("line")
+      .attr("class", "indicator macd-zero")
+      .attr("x1", xScale.range()[0])
+      .attr("x2", xScale.range()[1])
+      .attr("y1", macdScale(0))
+      .attr("y2", macdScale(0))
+      .attr("stroke", "#666")
+      .attr("stroke-width", 1)
+      .attr("stroke-dasharray", "2,2");
   };
 
   const renderRSI = (g: any, xScale: any, yScale: any) => {
     const closes = data.map(d => d.close);
     const rsiValues = TI.RSI.calculate({ period: 14, values: closes });
     
-    // This would need a separate scale for RSI values (0-100)
-    // Implementation would require additional panel
+    if (rsiValues.length === 0) return;
+
+    // Create RSI panel at bottom
+    const rsiHeight = 80;
+    const rsiY = yScale.range()[0] + 200;
+    
+    const rsiScale = d3.scaleLinear()
+      .domain([0, 100])
+      .range([rsiY + rsiHeight, rsiY]);
+
+    const rsiData = data.slice(14).map((d, i) => ({
+      date: d.date,
+      value: rsiValues[i] || 50
+    }));
+
+    // RSI line
+    const rsiLine = d3.line<any>()
+      .x(d => xScale(d.date))
+      .y(d => rsiScale(d.value))
+      .curve(d3.curveMonotoneX);
+
+    g.append("path")
+      .datum(rsiData)
+      .attr("class", "indicator rsi-line")
+      .attr("fill", "none")
+      .attr("stroke", "#9C27B0")
+      .attr("stroke-width", 2)
+      .attr("d", rsiLine);
+
+    // RSI reference lines
+    [30, 50, 70].forEach(level => {
+      g.append("line")
+        .attr("class", "indicator rsi-reference")
+        .attr("x1", xScale.range()[0])
+        .attr("x2", xScale.range()[1])
+        .attr("y1", rsiScale(level))
+        .attr("y2", rsiScale(level))
+        .attr("stroke", level === 50 ? "#666" : "#999")
+        .attr("stroke-width", 1)
+        .attr("stroke-dasharray", level === 50 ? "2,2" : "1,1");
+    });
+
+    // RSI area fill for overbought/oversold
+    const area = d3.area<any>()
+      .x(d => xScale(d.date))
+      .y0(d => rsiScale(Math.max(70, d.value)))
+      .y1(rsiScale(100))
+      .curve(d3.curveMonotoneX);
+
+    g.append("path")
+      .datum(rsiData.filter(d => d.value > 70))
+      .attr("class", "indicator rsi-overbought")
+      .attr("fill", "rgba(244, 67, 54, 0.2)")
+      .attr("d", area);
+
+    const areaOversold = d3.area<any>()
+      .x(d => xScale(d.date))
+      .y0(rsiScale(0))
+      .y1(d => rsiScale(Math.min(30, d.value)))
+      .curve(d3.curveMonotoneX);
+
+    g.append("path")
+      .datum(rsiData.filter(d => d.value < 30))
+      .attr("class", "indicator rsi-oversold")
+      .attr("fill", "rgba(76, 175, 80, 0.2)")
+      .attr("d", areaOversold);
   };
 
   const renderBollingerBands = (g: any, xScale: any, yScale: any, period: number, stdDev: number) => {
@@ -387,6 +547,27 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       .attr("stroke-width", 1)
       .attr("stroke-dasharray", "3,3")
       .attr("d", line);
+
+    // Add current value labels
+    if (bbData.length > 0) {
+      const lastValue = bbData[bbData.length - 1];
+      const labels = [
+        { value: lastValue.upper, label: 'Upper', offset: 0 },
+        { value: lastValue.middle, label: 'Middle', offset: 15 },
+        { value: lastValue.lower, label: 'Lower', offset: 30 }
+      ];
+
+      labels.forEach(({ value, label, offset }) => {
+        g.append("text")
+          .attr("class", "indicator bb-label")
+          .attr("x", xScale.range()[1] + 5)
+          .attr("y", yScale(value) + offset)
+          .attr("dy", "0.35em")
+          .attr("fill", "#2196F3")
+          .attr("font-size", "10px")
+          .text(`BB ${label}: ${value.toFixed(2)}`);
+      });
+    }
   };
 
   const renderAxes = (g: any, xScale: any, yScale: any, width: number, height: number) => {
