@@ -14,3 +14,47 @@ a {
 * {
   box-sizing: border-box;
 }
+
+/* Chart specific styles */
+.axis {
+  font-size: 12px;
+}
+
+.axis path,
+.axis line {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+
+.grid line {
+  stroke: #e0e0e0;
+  stroke-width: 1px;
+}
+
+.crosshair {
+  fill: none;
+  stroke: #999;
+  stroke-width: 1px;
+  stroke-dasharray: 3,3;
+  pointer-events: none;
+}
+
+.tooltip {
+  position: absolute;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  border-radius: 4px;
+  font-size: 12px;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+.drawing {
+  cursor: pointer;
+}
+
+.drawing:hover {
+  stroke-width: 3px !important;
+}
