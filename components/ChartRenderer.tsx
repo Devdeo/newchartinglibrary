@@ -47,10 +47,10 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     const g = svg.append("g")
       .attr("transform", `translate(${margin.left},${margin.top})`);
 
-    // Setup scales
+    // Setup scales - leave space for OI histogram on left when enabled
     const xScale = d3.scaleTime()
       .domain(d3.extent(data, d => d.date) as [Date, Date])
-      .range([0, config.showOI ? width * 0.75 : width]); // Leave space for OI histogram on right when enabled
+      .range([config.showOI ? width * 0.25 : 0, width]); // Leave space for OI histogram on left when enabled
 
     // Get proper price domain including all OHLC values
     const allPrices = data.flatMap(d => [d.open, d.high, d.low, d.close]);
@@ -596,10 +596,10 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     // Current price for reference
     const currentPrice = data.length > 0 ? data[data.length - 1].close : 50000;
 
-    // Filter OI data to show strikes within visible price range
+    // Filter OI data to show strikes within visible price range - use yScale domain for proper sync
+    const [minPrice, maxPrice] = yScale.domain();
     const visibleOI = oiData.filter(oi => {
-      const strikeY = yScale(oi.strikePrice);
-      return strikeY >= 0 && strikeY <= yScale.range()[0] && Math.abs(oi.strikePrice - currentPrice) <= currentPrice * 0.2;
+      return oi.strikePrice >= minPrice && oi.strikePrice <= maxPrice;
     });
 
     // Calculate max values for scaling histograms
@@ -608,12 +608,12 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     const maxCE_Change = Math.max(...visibleOI.map(oi => Math.abs(oi.ce.changeOI)));
     const maxPE_Change = Math.max(...visibleOI.map(oi => Math.abs(oi.pe.changeOI)));
 
-    // Maximum bar width - use the right 25% of total width
+    // Maximum bar width - use the left 25% of total width
     const oiAreaWidth = width * 0.25;
     const maxBarWidth = oiAreaWidth * 0.8;
 
-    // Base X position (right side of price chart)
-    const baseX = xScale.range()[1] + 10;
+    // Base X position (left side of price chart) - bars extend leftward from this point
+    const baseX = xScale.range()[0] - 10;
 
     // Create OI histogram overlay container with proper layering
     const oiOverlay = g.append("g")
@@ -633,10 +633,10 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       const peChangeWidth = Math.abs(oi.pe.changeOI) / maxPE_Change * maxBarWidth * 0.6;
 
       // Position bars around strike price: 2 above, strike in middle, 2 below
-      // CE OI (Red) - Top bar (2 positions above strike)
+      // CE OI (Red) - Top bar (2 positions above strike) - extends leftward
       oiOverlay.append("rect")
         .attr("class", "oi-histogram ce-oi")
-        .attr("x", baseX)
+        .attr("x", baseX - ceOIWidth)
         .attr("y", strikeY - (barHeight + barGap) * 2)
         .attr("width", ceOIWidth)
         .attr("height", barHeight)
@@ -645,11 +645,11 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         .append("title")
         .text(`CE OI: ${formatOI(oi.ce.oi)} @ ${oi.strikePrice}`);
 
-      // CE Change (Yellow) - Second bar (1 position above strike)
+      // CE Change (Yellow) - Second bar (1 position above strike) - extends leftward
       const ceChangeColor = oi.ce.changeOI >= 0 ? "#ffeb3b" : "#ffc107";
       oiOverlay.append("rect")
         .attr("class", "oi-histogram ce-change")
-        .attr("x", baseX)
+        .attr("x", baseX - ceChangeWidth)
         .attr("y", strikeY - (barHeight + barGap))
         .attr("width", ceChangeWidth)
         .attr("height", barHeight)
@@ -658,11 +658,11 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         .append("title")
         .text(`CE Change: ${oi.ce.changeOI >= 0 ? '+' : ''}${formatOI(oi.ce.changeOI)} @ ${oi.strikePrice}`);
 
-      // Strike price line and label at center
+      // Strike price line and label at center - extends across chart area
       oiOverlay.append("line")
         .attr("class", "strike-reference-line")
-        .attr("x1", xScale.range()[0])
-        .attr("x2", baseX + maxBarWidth)
+        .attr("x1", baseX - maxBarWidth)
+        .attr("x2", xScale.range()[1])
         .attr("y1", strikeY)
         .attr("y2", strikeY)
         .attr("stroke", Math.abs(oi.strikePrice - currentPrice) <= 100 ? "#ff9800" : "#e0e0e0")
@@ -670,22 +670,23 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         .attr("stroke-dasharray", "2,2")
         .attr("opacity", 0.3);
 
-      // Strike price label at the right edge (centered on strike price)
+      // Strike price label at the left edge (centered on strike price)
       oiOverlay.append("text")
         .attr("class", "oi-strike-label")
-        .attr("x", baseX + maxBarWidth + 5)
+        .attr("x", baseX - maxBarWidth - 5)
         .attr("y", strikeY)
         .attr("dy", "0.35em")
+        .attr("text-anchor", "end")
         .attr("font-size", "9px")
         .attr("font-weight", Math.abs(oi.strikePrice - currentPrice) <= 100 ? "bold" : "normal")
         .attr("fill", Math.abs(oi.strikePrice - currentPrice) <= 100 ? "#ff9800" : "#666")
         .text(oi.strikePrice.toLocaleString());
 
-      // PE Change (Blue) - Third bar (1 position below strike)
+      // PE Change (Blue) - Third bar (1 position below strike) - extends leftward
       const peChangeColor = oi.pe.changeOI >= 0 ? "#42a5f5" : "#1976d2";
       oiOverlay.append("rect")
         .attr("class", "oi-histogram pe-change")
-        .attr("x", baseX)
+        .attr("x", baseX - peChangeWidth)
         .attr("y", strikeY + barGap)
         .attr("width", peChangeWidth)
         .attr("height", barHeight)
@@ -694,10 +695,10 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         .append("title")
         .text(`PE Change: ${oi.pe.changeOI >= 0 ? '+' : ''}${formatOI(oi.pe.changeOI)} @ ${oi.strikePrice}`);
 
-      // PE OI (Green) - Bottom bar (2 positions below strike)
+      // PE OI (Green) - Bottom bar (2 positions below strike) - extends leftward
       oiOverlay.append("rect")
         .attr("class", "oi-histogram pe-oi")
-        .attr("x", baseX)
+        .attr("x", baseX - peOIWidth)
         .attr("y", strikeY + (barHeight + barGap) + barGap)
         .attr("width", peOIWidth)
         .attr("height", barHeight)
@@ -711,8 +712,8 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     const currentPriceY = yScale(currentPrice);
     oiOverlay.append("line")
       .attr("class", "current-price-line")
-      .attr("x1", xScale.range()[0])
-      .attr("x2", xScale.range()[1] + maxBarWidth + 100)
+      .attr("x1", baseX - maxBarWidth - 100)
+      .attr("x2", xScale.range()[1])
       .attr("y1", currentPriceY)
       .attr("y2", currentPriceY)
       .attr("stroke", "#ff5722")
@@ -721,7 +722,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
     // Current price label
     oiOverlay.append("rect")
-      .attr("x", xScale.range()[1] + maxBarWidth + 50)
+      .attr("x", baseX - maxBarWidth - 110)
       .attr("y", currentPriceY - 10)
       .attr("width", 60)
       .attr("height", 20)
@@ -729,7 +730,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       .attr("rx", 3);
 
     oiOverlay.append("text")
-      .attr("x", xScale.range()[1] + maxBarWidth + 80)
+      .attr("x", baseX - maxBarWidth - 80)
       .attr("y", currentPriceY)
       .attr("text-anchor", "middle")
       .attr("dy", "0.35em")
@@ -738,8 +739,8 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       .attr("fill", "white")
       .text(currentPrice.toFixed(0));
 
-    // Legend for OI histogram colors - position at top right of OI area
-    const legendX = baseX;
+    // Legend for OI histogram colors - position at top left of OI area
+    const legendX = baseX - maxBarWidth;
     const legendY = 10;
     const legendItems = [
       { color: "#ef5350", label: "CE OI", y: 0 },
@@ -826,8 +827,13 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       .attr("transform", `translate(0,${height * 0.7})`)
       .call(d3.axisBottom(xScale).tickFormat(d3.timeFormat("%m/%d")));
 
-    // Left Y-axis (minimal or hidden when OI is shown)
-    if (!config.showOI) {
+    // Left Y-axis (always show when OI is enabled for strike price reference)
+    if (config.showOI) {
+      g.append("g")
+        .attr("class", "axis y-axis-left")
+        .attr("transform", `translate(${xScale.range()[0]},0)`)
+        .call(d3.axisLeft(yScale).tickFormat(d => d3.format(".0f")(d)));
+    } else {
       g.append("g")
         .attr("class", "axis y-axis")
         .call(d3.axisLeft(yScale));
