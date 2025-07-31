@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 interface DrawingToolsProps {
   drawingMode: string;
@@ -7,6 +7,22 @@ interface DrawingToolsProps {
 }
 
 const DrawingTools: React.FC<DrawingToolsProps> = ({ drawingMode, setDrawingMode }) => {
+  const [isLargeScreen, setIsLargeScreen] = useState(true);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsLargeScreen(window.innerWidth > 768);
+    };
+
+    // Set initial value
+    handleResize();
+
+    // Add event listener
+    window.addEventListener('resize', handleResize);
+
+    // Cleanup
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   const tools = [
     { value: 'none', label: 'Select', icon: '🏺' },
     { value: 'line', label: 'Trend Line', icon: '📈' },
@@ -41,7 +57,7 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ drawingMode, setDrawingMode
       <h4 style={{ margin: '0 0 8px 0', fontSize: '12px', textAlign: 'center' }}>Drawing Tools</h4>
       <div style={{ 
         display: 'grid', 
-        gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth > 768 ? '1fr' : 'repeat(2, 1fr)', 
+        gridTemplateColumns: isLargeScreen ? '1fr' : 'repeat(2, 1fr)', 
         gap: '3px' 
       }}>
         {tools.map(tool => (
@@ -49,32 +65,32 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ drawingMode, setDrawingMode
             key={tool.value}
             onClick={() => setDrawingMode(tool.value)}
             style={{
-              padding: typeof window !== 'undefined' && window.innerWidth > 768 ? '6px 8px' : '4px',
+              padding: isLargeScreen ? '6px 8px' : '4px',
               border: '1px solid #ddd',
               borderRadius: '3px',
               backgroundColor: drawingMode === tool.value ? '#2196F3' : 'white',
               color: drawingMode === tool.value ? 'white' : 'black',
               cursor: 'pointer',
-              fontSize: typeof window !== 'undefined' && window.innerWidth > 768 ? '11px' : '9px',
+              fontSize: isLargeScreen ? '11px' : '9px',
               display: 'flex',
-              flexDirection: typeof window !== 'undefined' && window.innerWidth > 768 ? 'row' : 'column',
+              flexDirection: isLargeScreen ? 'row' : 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: typeof window !== 'undefined' && window.innerWidth > 768 ? '6px' : '2px',
+              gap: isLargeScreen ? '6px' : '2px',
               width: '100%',
               textAlign: 'center',
               minHeight: '32px'
             }}
             title={tool.label}
           >
-            <span style={{ fontSize: typeof window !== 'undefined' && window.innerWidth > 768 ? '14px' : '12px' }}>{tool.icon}</span>
+            <span style={{ fontSize: isLargeScreen ? '14px' : '12px' }}>{tool.icon}</span>
             <span style={{ 
               whiteSpace: 'nowrap', 
               overflow: 'hidden', 
               textOverflow: 'ellipsis',
               maxWidth: '100%'
             }}>
-              {typeof window !== 'undefined' && window.innerWidth > 768 ? tool.label : tool.label.split(' ')[0]}
+              {isLargeScreen ? tool.label : tool.label.split(' ')[0]}
             </span>
           </button>
         ))}

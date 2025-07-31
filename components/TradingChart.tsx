@@ -61,6 +61,7 @@ const TradingChart: React.FC = () => {
     showOI: false
   });
   const [drawingMode, setDrawingMode] = useState<string>('none');
+  const [isLargeScreen, setIsLargeScreen] = useState(true);
 
   useEffect(() => {
     // Generate sample data
@@ -70,6 +71,21 @@ const TradingChart: React.FC = () => {
     // Generate OI data
     const sampleOI = generateOIData();
     setOiData(sampleOI);
+  }, []);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsLargeScreen(window.innerWidth > 768);
+    };
+
+    // Set initial value
+    handleResize();
+
+    // Add event listener
+    window.addEventListener('resize', handleResize);
+
+    // Cleanup
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const generateSampleData = (): CandleData[] => {
@@ -155,7 +171,7 @@ const TradingChart: React.FC = () => {
         <div ref={chartRef} style={{ 
           flex: 1, 
           height: '100%',
-          marginLeft: typeof window !== 'undefined' && window.innerWidth > 768 ? '200px' : '20px',
+          marginLeft: isLargeScreen ? '200px' : '20px',
           marginRight: '10px'
         }}>
           <ChartRenderer 
