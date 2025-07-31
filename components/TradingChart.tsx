@@ -155,7 +155,7 @@ const TradingChart: React.FC = () => {
         <div ref={chartRef} style={{ 
           flex: 1, 
           height: '100%',
-          marginLeft: window.innerWidth > 768 ? '200px' : '20px',
+          marginLeft: typeof window !== 'undefined' && window.innerWidth > 768 ? '200px' : '20px',
           marginRight: '10px'
         }}>
           <ChartRenderer 
