@@ -58,7 +58,7 @@ const TradingChart: React.FC = () => {
     indicators: [],
     timeframe: '1D',
     symbol: 'BTCUSDT',
-    showOI: false
+    showOI: true // Enable OI by default to show the histogram
   });
   const [drawingMode, setDrawingMode] = useState<string>('none');
   const [isLargeScreen, setIsLargeScreen] = useState(true);
@@ -75,17 +75,25 @@ const TradingChart: React.FC = () => {
 
   useEffect(() => {
     const handleResize = () => {
-      setIsLargeScreen(window.innerWidth > 768);
+      if (typeof window !== 'undefined') {
+        setIsLargeScreen(window.innerWidth > 768);
+      }
     };
 
     // Set initial value
-    handleResize();
-
-    // Add event listener
-    window.addEventListener('resize', handleResize);
+    if (typeof window !== 'undefined') {
+      setIsLargeScreen(window.innerWidth > 768);
+      
+      // Add event listener
+      window.addEventListener('resize', handleResize);
+    }
 
     // Cleanup
-    return () => window.removeEventListener('resize', handleResize);
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('resize', handleResize);
+      }
+    };
   }, []);
 
   const generateSampleData = (): CandleData[] => {
@@ -167,11 +175,15 @@ const TradingChart: React.FC = () => {
         drawingMode={drawingMode}
         setDrawingMode={setDrawingMode}
       />
-      <div style={{ display: 'flex', height: '750px' }}>
+      <div style={{ display: 'flex', height: '750px', position: 'relative' }}>
+        <DrawingTools 
+          drawingMode={drawingMode}
+          setDrawingMode={setDrawingMode}
+        />
         <div ref={chartRef} style={{ 
           flex: 1, 
           height: '100%',
-          marginLeft: isLargeScreen ? '200px' : '20px',
+          marginLeft: isLargeScreen ? '10px' : '5px',
           marginRight: '10px'
         }}>
           <ChartRenderer 
@@ -183,10 +195,6 @@ const TradingChart: React.FC = () => {
           />
         </div>
       </div>
-      <DrawingTools 
-        drawingMode={drawingMode}
-        setDrawingMode={setDrawingMode}
-      />
     </div>
   );
 };

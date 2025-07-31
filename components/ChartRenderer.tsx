@@ -50,10 +50,13 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     // Setup scales
     const xScale = d3.scaleTime()
       .domain(d3.extent(data, d => d.date) as [Date, Date])
-      .range([0, width * 0.75]); // Leave space for OI histogram on right
+      .range([0, config.showOI ? width * 0.75 : width]); // Leave space for OI histogram on right when enabled
 
+    // Get proper price domain including all OHLC values
+    const allPrices = data.flatMap(d => [d.open, d.high, d.low, d.close]);
+    const priceExtent = d3.extent(allPrices) as [number, number];
     const yScale = d3.scaleLinear()
-      .domain(d3.extent(data, d => Math.max(d.high, d.low)) as [number, number])
+      .domain(priceExtent)
       .range([height * 0.7, 0]);
 
     const volumeScale = d3.scaleLinear()

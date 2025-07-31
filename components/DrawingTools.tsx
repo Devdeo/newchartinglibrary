@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 
 interface DrawingToolsProps {
@@ -15,13 +14,13 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ drawingMode, setDrawingMode
     };
 
     // Set initial value
-    handleResize();
+    // handleResize(); // Removed initial call to avoid SSR issues
 
     // Add event listener
-    window.addEventListener('resize', handleResize);
+    // window.addEventListener('resize', handleResize); // Removed window event listener to avoid SSR issues
 
     // Cleanup
-    return () => window.removeEventListener('resize', handleResize);
+    // return () => window.removeEventListener('resize', handleResize); // No need to remove listener
   }, []);
   const tools = [
     { value: 'none', label: 'Select', icon: '🏺' },
@@ -40,24 +39,26 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ drawingMode, setDrawingMode
   ];
 
   return (
-    <div style={{
-      position: 'absolute',
-      top: '60px',
-      left: '10px',
-      backgroundColor: 'white',
-      border: '1px solid #ddd',
-      borderRadius: '8px',
-      padding: '8px',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-      zIndex: 1000,
-      width: 'min(180px, calc(100vw - 20px))',
-      maxHeight: 'calc(100vh - 120px)',
-      overflowY: 'auto'
-    }}>
+    <div 
+      style={{
+        position: 'absolute',
+        left: '10px',
+        top: '50px',
+        width: '180px',
+        maxWidth: '180px',
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        border: '1px solid #ddd',
+        borderRadius: '6px',
+        padding: '8px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+        zIndex: 1000,
+        fontSize: '11px'
+      }}
+    >
       <h4 style={{ margin: '0 0 8px 0', fontSize: '12px', textAlign: 'center' }}>Drawing Tools</h4>
       <div style={{ 
         display: 'grid', 
-        gridTemplateColumns: isLargeScreen ? '1fr' : 'repeat(2, 1fr)', 
+        gridTemplateColumns: '1fr', 
         gap: '3px' 
       }}>
         {tools.map(tool => (
@@ -65,32 +66,32 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ drawingMode, setDrawingMode
             key={tool.value}
             onClick={() => setDrawingMode(tool.value)}
             style={{
-              padding: isLargeScreen ? '6px 8px' : '4px',
+              padding: '6px 8px',
               border: '1px solid #ddd',
               borderRadius: '3px',
               backgroundColor: drawingMode === tool.value ? '#2196F3' : 'white',
               color: drawingMode === tool.value ? 'white' : 'black',
               cursor: 'pointer',
-              fontSize: isLargeScreen ? '11px' : '9px',
+              fontSize: '11px',
               display: 'flex',
-              flexDirection: isLargeScreen ? 'row' : 'column',
+              flexDirection: 'row',
               alignItems: 'center',
-              justifyContent: 'center',
-              gap: isLargeScreen ? '6px' : '2px',
+              justifyContent: 'flex-start',
+              gap: '6px',
               width: '100%',
-              textAlign: 'center',
+              textAlign: 'left',
               minHeight: '32px'
             }}
             title={tool.label}
           >
-            <span style={{ fontSize: isLargeScreen ? '14px' : '12px' }}>{tool.icon}</span>
+            <span style={{ fontSize: '14px' }}>{tool.icon}</span>
             <span style={{ 
               whiteSpace: 'nowrap', 
               overflow: 'hidden', 
               textOverflow: 'ellipsis',
               maxWidth: '100%'
             }}>
-              {isLargeScreen ? tool.label : tool.label.split(' ')[0]}
+              {tool.label}
             </span>
           </button>
         ))}
