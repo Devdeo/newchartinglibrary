@@ -606,6 +606,9 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     // Maximum bar width (% of chart width)
     const maxBarWidth = xScale.range()[1] * 0.25; // 25% of chart width
 
+    // Base X position (right side of chart) - moved outside the loop
+    const baseX = xScale.range()[1] + 10;
+
     // Create OI histogram overlay container
     const oiOverlay = g.append("g")
       .attr("class", "oi-overlay");
@@ -621,9 +624,6 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       const peOIWidth = (oi.pe.oi / maxPE_OI) * maxBarWidth;
       const ceChangeWidth = Math.abs(oi.ce.changeOI) / maxCE_Change * maxBarWidth * 0.6; // Smaller scale for changes
       const peChangeWidth = Math.abs(oi.pe.changeOI) / maxPE_Change * maxBarWidth * 0.6;
-
-      // Base X position (right side of chart)
-      const baseX = xScale.range()[1] + 10;
 
       // Stack bars vertically at each strike price
       // CE OI (Red) - Top bar
