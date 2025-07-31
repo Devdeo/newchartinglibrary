@@ -259,32 +259,30 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   };
 
   const renderIndicators = (g: any, xScale: any, yScale: any) => {
-    const indicatorConfig = config.indicatorConfig || {};
+    const appliedIndicators = config.appliedIndicators || [];
     
-    config.indicators.forEach(indicator => {
-      const userConfig = indicatorConfig[indicator] || {};
-      
-      switch (indicator) {
+    appliedIndicators.forEach(indicator => {
+      switch (indicator.type) {
         case 'SMA':
-          renderSMA(g, xScale, yScale, userConfig.period || 20);
+          renderSMA(g, xScale, yScale, indicator.params.period || 20, indicator.color, indicator.id);
           break;
         case 'EMA':
-          renderEMA(g, xScale, yScale, userConfig.period || 20);
+          renderEMA(g, xScale, yScale, indicator.params.period || 20, indicator.color, indicator.id);
           break;
         case 'MACD':
-          renderMACD(g, xScale, yScale, userConfig);
+          renderMACD(g, xScale, yScale, indicator.params, indicator.color, indicator.id);
           break;
         case 'RSI':
-          renderRSI(g, xScale, yScale, userConfig.period || 14);
+          renderRSI(g, xScale, yScale, indicator.params.period || 14, indicator.color, indicator.id);
           break;
         case 'BB':
-          renderBollingerBands(g, xScale, yScale, userConfig.period || 20, userConfig.stdDev || 2);
+          renderBollingerBands(g, xScale, yScale, indicator.params.period || 20, indicator.params.stdDev || 2, indicator.color, indicator.id);
           break;
       }
     });
   };
 
-  const renderSMA = (g: any, xScale: any, yScale: any, period: number) => {
+  const renderSMA = (g: any, xScale: any, yScale: any, period: number, color: string = "#FF9800", id: string = "sma") => {
     const closes = data.map(d => d.close);
     const smaValues = TI.SMA.calculate({ period, values: closes });
     
@@ -300,9 +298,9 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
     g.append("path")
       .datum(smaData)
-      .attr("class", "indicator sma")
+      .attr("class", `indicator sma sma-${id}`)
       .attr("fill", "none")
-      .attr("stroke", "#FF9800")
+      .attr("stroke", color)
       .attr("stroke-width", 2)
       .attr("d", line);
 
@@ -310,18 +308,18 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     if (smaData.length > 0) {
       const lastValue = smaData[smaData.length - 1];
       g.append("text")
-        .attr("class", "indicator sma-label")
+        .attr("class", `indicator sma-label sma-label-${id}`)
         .attr("x", xScale.range()[1] + 5)
         .attr("y", yScale(lastValue.value))
         .attr("dy", "0.35em")
-        .attr("fill", "#FF9800")
+        .attr("fill", color)
         .attr("font-size", "12px")
         .attr("font-weight", "bold")
         .text(`SMA(${period}): ${lastValue.value.toFixed(2)}`);
     }
   };
 
-  const renderEMA = (g: any, xScale: any, yScale: any, period: number) => {
+  const renderEMA = (g: any, xScale: any, yScale: any, period: number, color: string = "#9C27B0", id: string = "ema") => {
     const closes = data.map(d => d.close);
     const emaValues = TI.EMA.calculate({ period, values: closes });
     
@@ -337,9 +335,9 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
     g.append("path")
       .datum(emaData)
-      .attr("class", "indicator ema")
+      .attr("class", `indicator ema ema-${id}`)
       .attr("fill", "none")
-      .attr("stroke", "#9C27B0")
+      .attr("stroke", color)
       .attr("stroke-width", 2)
       .attr("d", line);
 
@@ -347,18 +345,18 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     if (emaData.length > 0) {
       const lastValue = emaData[emaData.length - 1];
       g.append("text")
-        .attr("class", "indicator ema-label")
+        .attr("class", `indicator ema-label ema-label-${id}`)
         .attr("x", xScale.range()[1] + 5)
         .attr("y", yScale(lastValue.value))
         .attr("dy", "0.35em")
-        .attr("fill", "#9C27B0")
+        .attr("fill", color)
         .attr("font-size", "12px")
         .attr("font-weight", "bold")
         .text(`EMA(${period}): ${lastValue.value.toFixed(2)}`);
     }
   };
 
-  const renderMACD = (g: any, xScale: any, yScale: any, userConfig: any = {}) => {
+  const renderMACD = (g: any, xScale: any, yScale: any, userConfig: any = {}, color: string = "#2196F3", id: string = "macd") => {
     const closes = data.map(d => d.close);
     const fastPeriod = userConfig.fastPeriod || 12;
     const slowPeriod = userConfig.slowPeriod || 26;
@@ -399,9 +397,9 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
     g.append("path")
       .datum(macdData)
-      .attr("class", "indicator macd-line")
+      .attr("class", `indicator macd-line macd-line-${id}`)
       .attr("fill", "none")
-      .attr("stroke", "#2196F3")
+      .attr("stroke", color)
       .attr("stroke-width", 2)
       .attr("d", macdLine);
 
@@ -413,10 +411,11 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
     g.append("path")
       .datum(macdData)
-      .attr("class", "indicator macd-signal")
+      .attr("class", `indicator macd-signal macd-signal-${id}`)
       .attr("fill", "none")
-      .attr("stroke", "#FF9800")
+      .attr("stroke", color)
       .attr("stroke-width", 2)
+      .attr("stroke-opacity", 0.7)
       .attr("d", signalLine);
 
     // Histogram bars
@@ -445,7 +444,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       .attr("stroke-dasharray", "2,2");
   };
 
-  const renderRSI = (g: any, xScale: any, yScale: any, period: number = 14) => {
+  const renderRSI = (g: any, xScale: any, yScale: any, period: number = 14, color: string = "#9C27B0", id: string = "rsi") => {
     const closes = data.map(d => d.close);
     const rsiValues = TI.RSI.calculate({ period, values: closes });
     
@@ -472,9 +471,9 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
     g.append("path")
       .datum(rsiData)
-      .attr("class", "indicator rsi-line")
+      .attr("class", `indicator rsi-line rsi-line-${id}`)
       .attr("fill", "none")
-      .attr("stroke", "#9C27B0")
+      .attr("stroke", color)
       .attr("stroke-width", 2)
       .attr("d", rsiLine);
 
@@ -517,7 +516,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       .attr("d", areaOversold);
   };
 
-  const renderBollingerBands = (g: any, xScale: any, yScale: any, period: number, stdDev: number) => {
+  const renderBollingerBands = (g: any, xScale: any, yScale: any, period: number, stdDev: number, color: string = "#2196F3", id: string = "bb") => {
     const closes = data.map(d => d.close);
     const bbValues = TI.BollingerBands.calculate({
       period,
@@ -540,9 +539,9 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     // Upper band
     g.append("path")
       .datum(bbData.map(d => ({ date: d.date, value: d.upper })))
-      .attr("class", "indicator bb-upper")
+      .attr("class", `indicator bb-upper bb-upper-${id}`)
       .attr("fill", "none")
-      .attr("stroke", "#2196F3")
+      .attr("stroke", color)
       .attr("stroke-width", 1)
       .attr("stroke-dasharray", "3,3")
       .attr("d", line);
@@ -550,18 +549,18 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     // Middle band
     g.append("path")
       .datum(bbData.map(d => ({ date: d.date, value: d.middle })))
-      .attr("class", "indicator bb-middle")
+      .attr("class", `indicator bb-middle bb-middle-${id}`)
       .attr("fill", "none")
-      .attr("stroke", "#2196F3")
+      .attr("stroke", color)
       .attr("stroke-width", 1)
       .attr("d", line);
 
     // Lower band
     g.append("path")
       .datum(bbData.map(d => ({ date: d.date, value: d.lower })))
-      .attr("class", "indicator bb-lower")
+      .attr("class", `indicator bb-lower bb-lower-${id}`)
       .attr("fill", "none")
-      .attr("stroke", "#2196F3")
+      .attr("stroke", color)
       .attr("stroke-width", 1)
       .attr("stroke-dasharray", "3,3")
       .attr("d", line);
@@ -577,11 +576,11 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
       labels.forEach(({ value, label, offset }) => {
         g.append("text")
-          .attr("class", "indicator bb-label")
+          .attr("class", `indicator bb-label bb-label-${id}`)
           .attr("x", xScale.range()[1] + 5)
           .attr("y", yScale(value) + offset)
           .attr("dy", "0.35em")
-          .attr("fill", "#2196F3")
+          .attr("fill", color)
           .attr("font-size", "10px")
           .text(`BB ${label}: ${value.toFixed(2)}`);
       });

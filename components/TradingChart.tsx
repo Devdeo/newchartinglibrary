@@ -27,12 +27,21 @@ export interface OIData {
   };
 }
 
+export interface IndicatorInstance {
+  id: string;
+  type: string;
+  label: string;
+  color: string;
+  params: { [key: string]: any };
+}
+
 export interface ChartConfig {
   chartType: 'candlestick' | 'line' | 'area' | 'bar' | 'heikinashi';
   indicators: string[];
   timeframe: string;
   symbol: string;
   showOI: boolean;
+  appliedIndicators?: IndicatorInstance[];
   indicatorConfig?: {
     [key: string]: {
       [param: string]: number;
