@@ -281,7 +281,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       
       // Update indicators with current scales
       g.selectAll(".indicator").remove();
-      renderIndicators(g, currentXScale, currentYScale);
+      renderIndicators(g, currentXScale, currentYScale, height);
       
       renderAxes(g, currentXScale, currentYScale, width, height);
       updateCurrentPriceIndicator(g, currentYScale, width);
@@ -296,7 +296,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     setupDrawingInteractions(svg, g, xScale, yScale, drawingMode, drawingsRef);
   };
 
-  const renderIndicators = (g: any, xScale: any, yScale: any) => {
+  const renderIndicators = (g: any, xScale: any, yScale: any, chartHeight: number) => {
     const appliedIndicators = config.appliedIndicators || [];
 
     appliedIndicators.forEach(indicator => {
@@ -366,7 +366,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
             ...params,
             volumeScale: d3.scaleLinear()
               .domain([0, d3.max(data, d => d.volume) as number])
-              .range([height * 0.85, height * 0.75])
+              .range([chartHeight * 0.85, chartHeight * 0.75])
           };
           renderVolumeIndicator(volumeParams, data, renderIndicatorLabel);
           break;
