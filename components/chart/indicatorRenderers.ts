@@ -295,3 +295,64 @@ export const renderBollingerBands = (params: IndicatorRenderParams, data: Candle
 
   renderIndicatorLabel(g, xScale, yScale, bbData, `${label}(${period},${stdDev})`, color, id);
 };
+
+export const renderVolumeIndicator = (params: IndicatorRenderParams, data: CandleData[], renderIndicatorLabel: Function) => {
+  const { g, xScale, yScale, params: userParams, color = "#26a69a", id = "volume", label = "Volume" } = params;
+  const showMA = userParams?.showMA || true;
+  const maPeriod = userParams?.maPeriod || 20;
+  
+  const volumeHeight = 100;
+  const volumeY = yScale.range()[0] + 300;
+  
+  const volumeScale = d3.scaleLinear()
+    .domain([0, d3.max(data, d => d.volume) as number])
+    .range([volumeY + volumeHeight, volumeY]);
+
+  const barWidth = Math.max(1, (xScale.range()[1] - xScale.range()[0]) / data.length * 0.8);
+  
+  // Volume bars
+  g.selectAll(`.volume-indicator-bar-${id}`)
+    .data(data)
+    .enter()
+    .append("rect")
+    .attr("class", `indicator volume-indicator-bar volume-indicator-bar-${id}`)
+    .attr("x", d => xScale(d.date) - barWidth / 2)
+    .attr("y", d => volumeScale(d.volume))
+    .attr("width", barWidth)
+    .attr("height", d => volumeScale.range()[0] - volumeScale(d.volume))
+    .attr("fill", d => d.close >= d.open ? color : "#ef5350")
+    .attr("opacity", 0.7);
+
+  // Volume moving average if enabled
+  if (showMA) {
+    const volumes = data.map(d => d.volume);
+    const volumeMAValues = TI.SMA.calculate({ period: maPeriod, values: volumes });
+    
+    const volumeMAData = data.slice(maPeriod - 1).map((d, i) => ({
+      date: d.date,
+      value: volumeMAValues[i]
+    }));
+
+    const volumeMALine = d3.line<any>()
+      .x(d => xScale(d.date))
+      .y(d => volumeScale(d.value))
+      .curve(d3.curveMonotoneX);
+
+    g.append("path")
+      .datum(volumeMAData)
+      .attr("class", `indicator volume-ma volume-ma-${id}`)
+      .attr("fill", "none")
+      .attr("stroke", color)
+      .attr("stroke-width", 2)
+      .attr("d", volumeMALine);
+
+    renderIndicatorLabel(g, xScale, yScale, volumeMAData, `${label}${showMA ? ` MA(${maPeriod})` : ''}`, color, id, volumeY);
+  } else {
+    const volumeData = data.map(d => ({
+      date: d.date,
+      value: d.volume
+    }));
+    
+    renderIndicatorLabel(g, xScale, yScale, volumeData, label, color, id, volumeY);
+  }
+};

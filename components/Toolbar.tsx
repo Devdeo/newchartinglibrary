@@ -44,7 +44,8 @@ const Toolbar: React.FC<ToolbarProps> = ({ config, setConfig, drawingMode, setDr
     { value: 'KAMA', label: 'Kaufman AMA', defaultColor: '#FFC107' },
     { value: 'PSAR', label: 'Parabolic SAR', defaultColor: '#795548' },
     { value: 'DONCHIAN', label: 'Donchian Channel', defaultColor: '#9E9E9E' },
-    { value: 'HV', label: 'Historical Volatility', defaultColor: '#009688' }
+    { value: 'HV', label: 'Historical Volatility', defaultColor: '#009688' },
+    { value: 'VOLUME', label: 'Volume', defaultColor: '#26a69a' }
   ];
 
   const [showIndicatorDropdown, setShowIndicatorDropdown] = useState(false);
@@ -142,6 +143,8 @@ const Toolbar: React.FC<ToolbarProps> = ({ config, setConfig, drawingMode, setDr
         return { period: 20 };
       case 'HV':
         return { period: 30 };
+      case 'VOLUME':
+        return { showMA: true, maPeriod: 20 };
       default:
         return {};
     }
@@ -427,6 +430,36 @@ const Toolbar: React.FC<ToolbarProps> = ({ config, setConfig, drawingMode, setDr
               min="1"
               max="100"
             />
+          </div>
+        );
+
+      case 'VOLUME':
+        return (
+          <div>
+            <div style={{ marginBottom: '5px' }}>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={indicator.params.showMA || false}
+                  onChange={(e) => updateParam('showMA', e.target.checked)}
+                  style={{ marginRight: '5px' }}
+                />
+                Show Moving Average
+              </label>
+            </div>
+            {indicator.params.showMA && (
+              <div>
+                <label>MA Period: </label>
+                <input
+                  type="number"
+                  value={indicator.params.maPeriod || 20}
+                  onChange={(e) => updateParam('maPeriod', parseInt(e.target.value) || 20)}
+                  style={{ width: '60px', padding: '3px', marginLeft: '5px' }}
+                  min="1"
+                  max="100"
+                />
+              </div>
+            )}
           </div>
         );
 

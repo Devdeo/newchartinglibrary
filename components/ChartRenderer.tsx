@@ -3,7 +3,7 @@ import * as d3 from 'd3';
 import { CandleData, ChartConfig, OIData } from './TradingChart';
 import { ChartRendererProps, DrawingObject } from './chart/types';
 import { renderCandlesticks, renderLineChart, renderAreaChart, renderBarChart, renderHeikinAshi, renderVolume } from './chart/chartRenderers';
-import { renderSMA, renderEMA, renderWMA, renderRSI, renderMACD, renderBollingerBands } from './chart/indicatorRenderers';
+import { renderSMA, renderEMA, renderWMA, renderRSI, renderMACD, renderBollingerBands, renderVolumeIndicator } from './chart/indicatorRenderers';
 import { renderOIData } from './chart/oiRenderer';
 import { renderDrawings, setupDrawingInteractions } from './chart/drawingTools';
 import { renderIndicatorLabel, showIndicatorSettings } from './chart/indicatorSettings';
@@ -360,6 +360,9 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
             break;
         case 'HV':
             break;
+        case 'VOLUME':
+          renderVolumeIndicator(params, data, renderIndicatorLabel);
+          break;
       }
     });
   };
