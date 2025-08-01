@@ -52,9 +52,10 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       .domain([priceExtent[0] - pricePadding, priceExtent[1] + pricePadding])
       .range([height * 0.7, 0]);
 
+    // Volume indicator will have its own panel below the chart
     const volumeScale = d3.scaleLinear()
       .domain([0, d3.max(data, d => d.volume) as number])
-      .range([height * 0.7, height * 0.75]);
+      .range([height * 0.85, height * 0.75]);
 
     const defs = svg.append("defs");
     defs.append("clipPath")
@@ -65,13 +66,21 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       .attr("width", width)
       .attr("height", height * 0.75);
 
-    // Create a chart area for zoom interactions
+    defs.append("clipPath")
+      .attr("id", "volume-clip")
+      .append("rect")
+      .attr("x", 0)
+      .attr("y", height * 0.75)
+      .attr("width", width)
+      .attr("height", height * 0.1);
+
+    // Create a chart area for zoom interactions (main chart + volume panel)
     const chartArea = g.append("rect")
       .attr("class", "chart-zoom-area")
       .attr("x", 0)
       .attr("y", 0)
       .attr("width", width)
-      .attr("height", height * 0.75)
+      .attr("height", height * 0.85)
       .attr("fill", "transparent")
       .style("pointer-events", "all");
 
@@ -103,7 +112,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     // Time axis zoom (default scroll for desktop, horizontal pinch for mobile)
     const timeZoom = d3.zoom<SVGRectElement, unknown>()
       .scaleExtent([0.1, 50])
-      .translateExtent([[-width * 5, 0], [width * 6, height * 0.75]])
+      .translateExtent([[-width * 5, 0], [width * 6, height * 0.85]])
       .filter((event) => {
         // For mouse events
         if (event.type.includes('wheel')) {
@@ -268,7 +277,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           break;
       }
 
-      renderVolume(g, currentXScale, activeVolumeScale, data);
+      renderVolumeHistogram(g, currentXScale, activeVolumeScale, data, width, height);
       
       // Update indicators with current scales
       g.selectAll(".indicator").remove();
@@ -355,14 +364,135 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     });
   };
 
+  const renderVolumeHistogram = (g: any, xScale: any, volumeScale: any, data: CandleData[], width: number, height: number) => {
+    const barWidth = Math.max(1, (xScale.range()[1] - xScale.range()[0]) / data.length * 0.8);
+    
+    // Volume panel background
+    g.append("rect")
+      .attr("class", "volume-panel-bg")
+      .attr("x", 0)
+      .attr("y", height * 0.75)
+      .attr("width", width)
+      .attr("height", height * 0.1)
+      .attr("fill", "#f8f9fa")
+      .attr("stroke", "#e0e0e0")
+      .attr("stroke-width", 1);
+
+    const volumeGroup = g.append("g")
+      .attr("class", "volume-histogram")
+      .attr("clip-path", "url(#volume-clip)");
+
+    // Volume bars with color coding based on price movement
+    volumeGroup.selectAll(".volume-bar")
+      .data(data)
+      .enter()
+      .append("rect")
+      .attr("class", "volume-bar")
+      .attr("x", d => xScale(d.date) - barWidth / 2)
+      .attr("y", d => volumeScale(d.volume))
+      .attr("width", barWidth)
+      .attr("height", d => volumeScale.range()[0] - volumeScale(d.volume))
+      .attr("fill", d => d.close >= d.open ? "#26a69a" : "#ef5350")
+      .attr("opacity", 0.7)
+      .style("cursor", "pointer")
+      .on("mouseover", function(event, d) {
+        d3.select(this).attr("opacity", 1);
+        
+        // Tooltip for volume
+        const tooltip = d3.select("body").selectAll(".volume-tooltip").data([null]);
+        const tooltipEnter = tooltip.enter().append("div")
+          .attr("class", "volume-tooltip")
+          .style("position", "absolute")
+          .style("background", "rgba(0,0,0,0.8)")
+          .style("color", "white")
+          .style("padding", "8px")
+          .style("border-radius", "4px")
+          .style("font-size", "12px")
+          .style("pointer-events", "none")
+          .style("z-index", "1000");
+        
+        tooltipEnter.merge(tooltip)
+          .html(`
+            <div><strong>Volume: ${d.volume.toLocaleString()}</strong></div>
+            <div>Date: ${d.date.toLocaleDateString()}</div>
+            <div>Price: ${d.close.toFixed(2)}</div>
+          `)
+          .style("left", (event.pageX + 10) + "px")
+          .style("top", (event.pageY - 10) + "px")
+          .style("opacity", 1);
+      })
+      .on("mouseout", function() {
+        d3.select(this).attr("opacity", 0.7);
+        d3.select(".volume-tooltip").style("opacity", 0);
+      });
+
+    // Volume panel title
+    g.append("text")
+      .attr("class", "volume-title")
+      .attr("x", 10)
+      .attr("y", height * 0.76)
+      .attr("font-size", "12px")
+      .attr("font-weight", "bold")
+      .attr("fill", "#666")
+      .text("Volume");
+
+    // Volume scale axis (right side)
+    const volumeAxis = g.append("g")
+      .attr("class", "axis volume-axis")
+      .attr("transform", `translate(${width}, 0)`)
+      .call(d3.axisRight(volumeScale)
+        .ticks(3)
+        .tickFormat(d => {
+          if (d >= 1000000) return (d / 1000000).toFixed(1) + 'M';
+          if (d >= 1000) return (d / 1000).toFixed(1) + 'K';
+          return d.toString();
+        })
+        .tickSizeInner(-width)
+        .tickSizeOuter(0));
+
+    volumeAxis.selectAll(".tick line")
+      .attr("stroke", "#e0e0e0")
+      .attr("stroke-width", 0.5);
+
+    volumeAxis.selectAll(".tick text")
+      .attr("font-size", "10px")
+      .attr("fill", "#666")
+      .style("text-anchor", "start")
+      .attr("dx", "5px");
+
+    // Average volume line
+    const avgVolume = d3.mean(data, d => d.volume) || 0;
+    g.append("line")
+      .attr("class", "avg-volume-line")
+      .attr("x1", 0)
+      .attr("x2", width)
+      .attr("y1", volumeScale(avgVolume))
+      .attr("y2", volumeScale(avgVolume))
+      .attr("stroke", "#ff9800")
+      .attr("stroke-width", 1)
+      .attr("stroke-dasharray", "3,3")
+      .attr("opacity", 0.6);
+
+    // Average volume label
+    g.append("text")
+      .attr("class", "avg-volume-label")
+      .attr("x", width - 5)
+      .attr("y", volumeScale(avgVolume) - 3)
+      .attr("text-anchor", "end")
+      .attr("font-size", "10px")
+      .attr("fill", "#ff9800")
+      .attr("font-weight", "bold")
+      .text("Avg");
+  };
+
   const renderAxes = (g: any, xScale: any, yScale: any, width: number, height: number) => {
-    // Time axis
+    // Time axis (below volume panel)
     g.append("g")
       .attr("class", "axis x-axis")
-      .attr("transform", `translate(0,${height * 0.75})`)
+      .attr("transform", `translate(0,${height * 0.85})`)
       .call(d3.axisBottom(xScale)
         .tickFormat(d3.timeFormat("%m/%d"))
-        .tickSizeInner(-height * 0.75)
+        .tickSizeInner(-height * 0.85)
         .tickSizeOuter(0))
       .selectAll(".tick line")
       .attr("stroke", "#e0e0e0")
@@ -483,6 +613,10 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         <div>📱 Horizontal pinch: Zoom time</div>
         <div>📱 Vertical pinch: Zoom price</div>
         <div>📱 Diagonal pinch: Zoom both</div>
+        <div style={{ marginTop: '8px' }}><strong>Volume:</strong></div>
+        <div>📊 Green: Bullish volume</div>
+        <div>📊 Red: Bearish volume</div>
+        <div>📊 Orange line: Average volume</div>
       </div>
       <svg ref={svgRef} style={{ width: '100%', height: '100%', cursor: drawingMode !== 'none' ? 'crosshair' : 'default' }}>
       </svg>
