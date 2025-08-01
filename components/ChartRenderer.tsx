@@ -65,32 +65,54 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       .attr("width", width)
       .attr("height", height * 0.75);
 
-    const zoom = d3.zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.1, 10])
-      .translateExtent([[-width * 2, -height * 2], [width * 3, height * 3]])
+    // Separate zoom behaviors for X and Y axes
+    const xZoom = d3.zoom<SVGSVGElement, unknown>()
+      .scaleExtent([0.1, 50])
+      .translateExtent([[-width * 5, -height], [width * 6, height]])
+      .filter((event) => !event.shiftKey)
+      .on("zoom", (event) => {
+        const { transform } = event;
+        const newXScale = transform.rescaleX(xScale);
+        updateChart(newXScale, yScale);
+      });
+
+    const yZoom = d3.zoom<SVGSVGElement, unknown>()
+      .scaleExtent([0.1, 50])
+      .translateExtent([[-width, -height * 5], [width, height * 6]])
+      .filter((event) => event.shiftKey)
+      .on("zoom", (event) => {
+        const { transform } = event;
+        const newYScale = transform.rescaleY(yScale);
+        updateChart(xScale, newYScale);
+      });
+
+    // Combined zoom for both axes
+    const combinedZoom = d3.zoom<SVGSVGElement, unknown>()
+      .scaleExtent([0.1, 50])
+      .translateExtent([[-width * 5, -height * 5], [width * 6, height * 6]])
+      .filter((event) => event.ctrlKey || event.metaKey)
       .on("zoom", (event) => {
         const { transform } = event;
         const newXScale = transform.rescaleX(xScale);
         const newYScale = transform.rescaleY(yScale);
-        const newVolumeScale = d3.scaleLinear()
-          .domain(volumeScale.domain())
-          .range([height * 0.7, height * 0.75]);
-        updateChart(newXScale, newYScale, newVolumeScale);
+        updateChart(newXScale, newYScale);
       });
 
-    svg.call(zoom);
-    zoomRef.current = zoom;
+    svg.call(xZoom).call(yZoom).call(combinedZoom);
+    zoomRef.current = xZoom;
     svg.selectAll(".axis").style("pointer-events", "all");
 
     updateChart(xScale, yScale);
 
     function updateChart(currentXScale: any, currentYScale: any, currentVolumeScale?: any) {
-      const activeVolumeScale = currentVolumeScale || volumeScale;
+      const activeVolumeScale = currentVolumeScale || d3.scaleLinear()
+        .domain([0, d3.max(data, d => d.volume) as number])
+        .range([height * 0.7, height * 0.75]);
 
+      // Only remove chart elements, preserve indicators unless they need updating
       g.selectAll(".candle").remove();
       g.selectAll(".volume-bar").remove();
       g.selectAll(".axis").remove();
-      g.selectAll(".indicator").remove();
       g.selectAll(".oi-overlay").remove();
 
       switch (config.chartType) {
@@ -112,7 +134,11 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       }
 
       renderVolume(g, currentXScale, activeVolumeScale, data);
+      
+      // Update indicators with current scales
+      g.selectAll(".indicator").remove();
       renderIndicators(g, currentXScale, currentYScale);
+      
       renderAxes(g, currentXScale, currentYScale, width, height);
       updateCurrentPriceIndicator(g, currentYScale, width);
 
@@ -309,8 +335,27 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   };
 
   return (
-    <svg ref={svgRef} style={{ width: '100%', height: '100%', cursor: drawingMode !== 'none' ? 'crosshair' : 'default' }}>
-    </svg>
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <div style={{
+        position: 'absolute',
+        top: '10px',
+        left: '10px',
+        background: 'rgba(255,255,255,0.9)',
+        padding: '8px',
+        borderRadius: '4px',
+        fontSize: '11px',
+        color: '#666',
+        zIndex: 100,
+        border: '1px solid #ddd'
+      }}>
+        <div>🖱️ Drag: Pan chart</div>
+        <div>⇧ + Scroll: Zoom price axis</div>
+        <div>Scroll: Zoom time axis</div>
+        <div>Ctrl/⌘ + Scroll: Zoom both axes</div>
+      </div>
+      <svg ref={svgRef} style={{ width: '100%', height: '100%', cursor: drawingMode !== 'none' ? 'crosshair' : 'default' }}>
+      </svg>
+    </div>
   );
 };
 
