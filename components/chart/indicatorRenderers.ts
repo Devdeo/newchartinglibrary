@@ -297,60 +297,71 @@ export const renderBollingerBands = (params: IndicatorRenderParams, data: Candle
 };
 
 export const renderVolumeIndicator = (params: IndicatorRenderParams, data: CandleData[], renderIndicatorLabel: Function) => {
-  const { g, xScale, yScale, params: userParams, color = "#26a69a", id = "volume", label = "Volume" } = params;
-  const showMA = userParams?.showMA || true;
+  const { g, xScale, yScale, params: userParams, color = "#FFB74D", id = "volume", label = "Volume" } = params;
+  const showMA = userParams?.showMA !== false; // Default to true
   const maPeriod = userParams?.maPeriod || 20;
   
-  // Use the existing volume histogram area (height * 0.75 to height * 0.85)
+  // Calculate height from yScale range
   const height = Math.abs(yScale.range()[0] - yScale.range()[1]);
-  const volumeScale = d3.scaleLinear()
+  
+  // Use the volumeScale passed from params (should match the existing histogram scale)
+  const volumeScale = params.volumeScale || d3.scaleLinear()
     .domain([0, d3.max(data, d => d.volume) as number])
     .range([height * 0.85, height * 0.75]);
 
   // Volume moving average overlay on existing histogram if enabled
-  if (showMA) {
+  if (showMA && data.length >= maPeriod) {
     const volumes = data.map(d => d.volume);
     const volumeMAValues = TI.SMA.calculate({ period: maPeriod, values: volumes });
     
     const volumeMAData = data.slice(maPeriod - 1).map((d, i) => ({
       date: d.date,
       value: volumeMAValues[i]
-    }));
+    })).filter(d => d.value != null);
 
-    const volumeMALine = d3.line<any>()
-      .x(d => xScale(d.date))
-      .y(d => volumeScale(d.value))
-      .curve(d3.curveMonotoneX);
+    if (volumeMAData.length > 0) {
+      const volumeMALine = d3.line<any>()
+        .x(d => xScale(d.date))
+        .y(d => volumeScale(d.value))
+        .curve(d3.curveMonotoneX);
 
-    g.append("path")
-      .datum(volumeMAData)
-      .attr("class", `indicator volume-ma volume-ma-${id}`)
-      .attr("fill", "none")
-      .attr("stroke", color)
-      .attr("stroke-width", 3)
-      .attr("opacity", 0.9)
-      .attr("clip-path", "url(#volume-clip)")
-      .attr("d", volumeMALine);
+      g.append("path")
+        .datum(volumeMAData)
+        .attr("class", `indicator volume-ma volume-ma-${id}`)
+        .attr("fill", "none")
+        .attr("stroke", color)
+        .attr("stroke-width", 2)
+        .attr("opacity", 0.9)
+        .attr("clip-path", "url(#volume-clip)")
+        .attr("d", volumeMALine);
 
-    // Add a label for the volume MA
-    const volumeMAY = height * 0.75;
-    renderIndicatorLabel(g, xScale, yScale, volumeMAData, `${label} MA(${maPeriod})`, color, id, volumeMAY);
+      // Add a label for the volume MA in the volume panel
+      g.append("text")
+        .attr("class", `indicator volume-ma-label volume-ma-label-${id}`)
+        .attr("x", 10)
+        .attr("y", height * 0.78)
+        .attr("font-size", "10px")
+        .attr("font-weight", "bold")
+        .attr("fill", color)
+        .attr("opacity", 0.9)
+        .text(`Vol MA(${maPeriod})`);
+    }
   }
 
-  // Add volume indicator enhancement markers
-  const volumeData = data.map(d => ({
-    date: d.date,
-    value: d.volume
-  }));
+  // Add volume indicator enhancement - highlight volume bars with stronger colors
+  g.selectAll(".volume-bar")
+    .attr("opacity", 0.8)
+    .attr("stroke", d => d.close >= d.open ? "#1B5E20" : "#B71C1C")
+    .attr("stroke-width", 0.5);
   
-  // Add subtle indicator that volume indicator is active
+  // Add volume indicator active marker
   g.append("text")
     .attr("class", `indicator volume-indicator-active volume-indicator-active-${id}`)
-    .attr("x", 10)
-    .attr("y", height * 0.84)
+    .attr("x", 80)
+    .attr("y", height * 0.76)
     .attr("font-size", "10px")
     .attr("font-weight", "bold")
     .attr("fill", color)
     .attr("opacity", 0.8)
-    .text("Volume Indicator Active");
+    .text("📊");
 };

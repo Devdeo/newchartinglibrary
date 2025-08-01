@@ -277,7 +277,10 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           break;
       }
 
-      renderVolumeHistogram(g, currentXScale, activeVolumeScale, data, width, height);
+      // Always render volume histogram if volume data exists
+      if (data.length > 0 && data[0].volume !== undefined) {
+        renderVolumeHistogram(g, currentXScale, activeVolumeScale, data, width, height);
+      }
       
       // Update indicators with current scales
       g.selectAll(".indicator").remove();
@@ -375,6 +378,14 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   };
 
   const renderVolumeHistogram = (g: any, xScale: any, volumeScale: any, data: CandleData[], width: number, height: number) => {
+    // Clear existing volume elements
+    g.selectAll(".volume-panel-bg").remove();
+    g.selectAll(".volume-histogram").remove();
+    g.selectAll(".volume-title").remove();
+    g.selectAll(".volume-axis").remove();
+    g.selectAll(".avg-volume-line").remove();
+    g.selectAll(".avg-volume-label").remove();
+    
     const barWidth = Math.max(1, (xScale.range()[1] - xScale.range()[0]) / data.length * 0.8);
     
     // Volume panel background
