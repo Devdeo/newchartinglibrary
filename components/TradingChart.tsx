@@ -98,20 +98,23 @@ const TradingChart: React.FC = () => {
 
   const generateSampleData = (): CandleData[] => {
     const data: CandleData[] = [];
-    let price = 50000;
+    let price = 100; // Start with simple price of 100
     const startDate = new Date('2023-01-01');
 
-    for (let i = 0; i < 365; i++) {
+    for (let i = 0; i < 100; i++) { // Reduced to 100 days for simplicity
       const date = new Date(startDate);
       date.setDate(startDate.getDate() + i);
 
-      const change = (Math.random() - 0.5) * 1000;
+      // Simple price movements - up or down by 1-5
+      const change = Math.floor((Math.random() - 0.5) * 10); // -5 to +5
       const open = price;
       price += change;
       const close = price;
-      const high = Math.max(open, close) + Math.random() * 500;
-      const low = Math.min(open, close) - Math.random() * 500;
-      const volume = Math.random() * 1000000;
+      
+      // Simple high/low calculation
+      const high = Math.max(open, close) + Math.floor(Math.random() * 3); // +0 to +2
+      const low = Math.min(open, close) - Math.floor(Math.random() * 3); // -0 to -2
+      const volume = Math.floor(Math.random() * 1000) + 100; // 100-1100
 
       data.push({
         date,
@@ -128,38 +131,47 @@ const TradingChart: React.FC = () => {
 
   const generateOIData = (): OIData[] => {
     const oiData: OIData[] = [];
-    const currentPrice = data.length > 0 ? data[data.length - 1].close : 50000;
-    const strikeGap = 100;
+    const currentPrice = data.length > 0 ? data[data.length - 1].close : 100;
     
-    // Generate strikes from -15% to +15% of current price
-    for (let i = -30; i <= 30; i++) {
-      const strikePrice = Math.round((currentPrice + (i * strikeGap)) / 100) * 100; // Round to nearest 100
-      const distanceFromMoney = Math.abs(strikePrice - currentPrice);
+    // Generate simple strikes around current price with gap of 5
+    for (let i = -10; i <= 10; i++) {
+      const strikePrice = currentPrice + (i * 5); // Strike every 5 points
       
-      // Higher OI for strikes closer to current price
-      const baseOI = Math.max(1000, 15000 - (distanceFromMoney / 100) * 300);
-      const oiVariation = 0.3; // 30% variation
+      // Simple OI values based on distance from current price
+      let ceOI, peOI;
+      const distance = Math.abs(i);
       
-      // CE tends to have higher OI for OTM (strikes above current price)
-      const ceMultiplier = strikePrice > currentPrice ? 1.2 : 0.8;
-      // PE tends to have higher OI for OTM (strikes below current price)  
-      const peMultiplier = strikePrice < currentPrice ? 1.2 : 0.8;
+      if (distance === 0) {
+        // ATM strikes
+        ceOI = 50;
+        peOI = 50;
+      } else if (distance <= 2) {
+        // Near ATM
+        ceOI = 40;
+        peOI = 40;
+      } else if (distance <= 5) {
+        // Moderate OTM
+        ceOI = 30;
+        peOI = 30;
+      } else {
+        // Deep OTM
+        ceOI = 10;
+        peOI = 10;
+      }
       
-      const ceOI = Math.floor((baseOI * ceMultiplier) * (1 + (Math.random() - 0.5) * oiVariation));
-      const peOI = Math.floor((baseOI * peMultiplier) * (1 + (Math.random() - 0.5) * oiVariation));
-      
-      // Changes tend to be smaller for ATM strikes
-      const changeVariation = Math.min(2000, distanceFromMoney / 10);
+      // Simple change values
+      const ceChange = Math.floor((Math.random() - 0.5) * 10); // -5 to +5
+      const peChange = Math.floor((Math.random() - 0.5) * 10); // -5 to +5
       
       oiData.push({
         strikePrice,
         ce: {
-          oi: Math.max(500, ceOI),
-          changeOI: Math.floor((Math.random() - 0.5) * changeVariation)
+          oi: ceOI,
+          changeOI: ceChange
         },
         pe: {
-          oi: Math.max(500, peOI),
-          changeOI: Math.floor((Math.random() - 0.5) * changeVariation)
+          oi: peOI,
+          changeOI: peChange
         }
       });
     }
@@ -183,7 +195,7 @@ const TradingChart: React.FC = () => {
         <div ref={chartRef} style={{ 
           flex: 1, 
           height: '100%',
-          marginLeft: isLargeScreen ? '10px' : '5px',
+          marginLeft: isLargeScreen ? '100px' : '70px', // Increased margin to avoid overlap with drawing tools
           marginRight: '10px'
         }}>
           <ChartRenderer 

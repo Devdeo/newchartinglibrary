@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { ChartConfig } from './TradingChart';
 
@@ -35,7 +34,17 @@ const Toolbar: React.FC<ToolbarProps> = ({ config, setConfig, drawingMode, setDr
     { value: 'STOCH', label: 'Stochastic', defaultColor: '#FF5722' },
     { value: 'ADX', label: 'ADX', defaultColor: '#4CAF50' },
     { value: 'CCI', label: 'Commodity Channel Index', defaultColor: '#FF9800' },
-    { value: 'WILLIAMS', label: 'Williams %R', defaultColor: '#795548' }
+    { value: 'WILLIAMS', label: 'Williams %R', defaultColor: '#795548' },
+    { value: 'WMA', label: 'Weighted Moving Average', defaultColor: '#673AB7' },
+    { value: 'STOCHRSI', label: 'Stochastic RSI', defaultColor: '#E91E63' },
+    { value: 'ATR', label: 'Average True Range', defaultColor: '#607D8B' },
+    { value: 'MFI', label: 'Money Flow Index', defaultColor: '#00BCD4' },
+    { value: 'TRIX', label: 'TRIX', defaultColor: '#3F51B5' },
+    { value: 'ROC', label: 'Rate of Change', defaultColor: '#CDDC39' },
+    { value: 'KAMA', label: 'Kaufman AMA', defaultColor: '#FFC107' },
+    { value: 'PSAR', label: 'Parabolic SAR', defaultColor: '#795548' },
+    { value: 'DONCHIAN', label: 'Donchian Channel', defaultColor: '#9E9E9E' },
+    { value: 'HV', label: 'Historical Volatility', defaultColor: '#009688' }
   ];
 
   const [showIndicatorDropdown, setShowIndicatorDropdown] = useState(false);
@@ -113,6 +122,26 @@ const Toolbar: React.FC<ToolbarProps> = ({ config, setConfig, drawingMode, setDr
         return { period: 20 };
       case 'WILLIAMS':
         return { period: 14 };
+      case 'WMA':
+        return { period: 20 };
+      case 'STOCHRSI':
+        return { rsiPeriod: 14, stochPeriod: 14, kPeriod: 3 };
+      case 'ATR':
+        return { period: 14 };
+      case 'MFI':
+        return { period: 14 };
+      case 'TRIX':
+        return { period: 18 };
+      case 'ROC':
+        return { period: 12 };
+      case 'KAMA':
+        return { period: 10, fastSC: 2, slowSC: 30 };
+      case 'PSAR':
+        return { step: 0.02, max: 0.2 };
+      case 'DONCHIAN':
+        return { period: 20 };
+      case 'HV':
+        return { period: 30 };
       default:
         return {};
     }
@@ -141,7 +170,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ config, setConfig, drawingMode, setDr
             />
           </div>
         );
-      
+
       case 'RSI':
         return (
           <div>
@@ -156,7 +185,251 @@ const Toolbar: React.FC<ToolbarProps> = ({ config, setConfig, drawingMode, setDr
             />
           </div>
         );
-      
+
+      case 'WMA':
+        return (
+          <div>
+            <label>Period: </label>
+            <input
+              type="number"
+              value={indicator.params.period || 20}
+              onChange={(e) => updateParam('period', parseInt(e.target.value) || 20)}
+              style={{ width: '60px', padding: '3px', marginLeft: '5px' }}
+              min="1"
+              max="100"
+            />
+          </div>
+        );
+
+      case 'STOCHRSI':
+        return (
+          <div>
+            <div style={{ marginBottom: '5px' }}>
+              <label>RSI Period: </label>
+              <input
+                type="number"
+                value={indicator.params.rsiPeriod || 14}
+                onChange={(e) => updateParam('rsiPeriod', parseInt(e.target.value) || 14)}
+                style={{ width: '60px', padding: '3px', marginLeft: '5px' }}
+                min="1"
+                max="50"
+              />
+            </div>
+            <div style={{ marginBottom: '5px' }}>
+              <label>Stoch Period: </label>
+              <input
+                type="number"
+                value={indicator.params.stochPeriod || 14}
+                onChange={(e) => updateParam('stochPeriod', parseInt(e.target.value) || 14)}
+                style={{ width: '60px', padding: '3px', marginLeft: '5px' }}
+                min="1"
+                max="50"
+              />
+            </div>
+            <div>
+              <label>K Period: </label>
+              <input
+                type="number"
+                value={indicator.params.kPeriod || 3}
+                onChange={(e) => updateParam('kPeriod', parseInt(e.target.value) || 3)}
+                style={{ width: '60px', padding: '3px', marginLeft: '5px' }}
+                min="1"
+                max="10"
+              />
+            </div>
+          </div>
+        );
+
+      case 'STOCH':
+        return (
+          <div>
+            <div style={{ marginBottom: '5px' }}>
+              <label>Period: </label>
+              <input
+                type="number"
+                value={indicator.params.period || 14}
+                onChange={(e) => updateParam('period', parseInt(e.target.value) || 14)}
+                style={{ width: '60px', padding: '3px', marginLeft: '5px' }}
+                min="1"
+                max="50"
+              />
+            </div>
+            <div style={{ marginBottom: '5px' }}>
+              <label>Signal Period: </label>
+              <input
+                type="number"
+                value={indicator.params.signalPeriod || 3}
+                onChange={(e) => updateParam('signalPeriod', parseInt(e.target.value) || 3)}
+                style={{ width: '60px', padding: '3px', marginLeft: '5px' }}
+                min="1"
+                max="10"
+              />
+            </div>
+          </div>
+        );
+
+      case 'ADX':
+        return (
+          <div>
+            <label>Period: </label>
+            <input
+              type="number"
+              value={indicator.params.period || 14}
+              onChange={(e) => updateParam('period', parseInt(e.target.value) || 14)}
+              style={{ width: '60px', padding: '3px', marginLeft: '5px' }}
+              min="1"
+              max="50"
+            />
+          </div>
+        );
+
+      case 'CCI':
+      case 'WILLIAMS':
+      case 'ATR':
+      case 'MFI':
+        return (
+          <div>
+            <label>Period: </label>
+            <input
+              type="number"
+              value={indicator.params.period || 14}
+              onChange={(e) => updateParam('period', parseInt(e.target.value) || 14)}
+              style={{ width: '60px', padding: '3px', marginLeft: '5px' }}
+              min="1"
+              max="50"
+            />
+          </div>
+        );
+
+      case 'TRIX':
+        return (
+          <div>
+            <label>Period: </label>
+            <input
+              type="number"
+              value={indicator.params.period || 18}
+              onChange={(e) => updateParam('period', parseInt(e.target.value) || 18)}
+              style={{ width: '60px', padding: '3px', marginLeft: '5px' }}
+              min="1"
+              max="50"
+            />
+          </div>
+        );
+
+      case 'ROC':
+        return (
+          <div>
+            <label>Period: </label>
+            <input
+              type="number"
+              value={indicator.params.period || 12}
+              onChange={(e) => updateParam('period', parseInt(e.target.value) || 12)}
+              style={{ width: '60px', padding: '3px', marginLeft: '5px' }}
+              min="1"
+              max="50"
+            />
+          </div>
+        );
+
+      case 'KAMA':
+        return (
+          <div>
+            <div style={{ marginBottom: '5px' }}>
+              <label>Period: </label>
+              <input
+                type="number"
+                value={indicator.params.period || 10}
+                onChange={(e) => updateParam('period', parseInt(e.target.value) || 10)}
+                style={{ width: '60px', padding: '3px', marginLeft: '5px' }}
+                min="1"
+                max="50"
+              />
+            </div>
+            <div style={{ marginBottom: '5px' }}>
+              <label>Fast SC: </label>
+              <input
+                type="number"
+                value={indicator.params.fastSC || 2}
+                onChange={(e) => updateParam('fastSC', parseInt(e.target.value) || 2)}
+                style={{ width: '60px', padding: '3px', marginLeft: '5px' }}
+                min="1"
+                max="10"
+              />
+            </div>
+            <div>
+              <label>Slow SC: </label>
+              <input
+                type="number"
+                value={indicator.params.slowSC || 30}
+                onChange={(e) => updateParam('slowSC', parseInt(e.target.value) || 30)}
+                style={{ width: '60px', padding: '3px', marginLeft: '5px' }}
+                min="1"
+                max="50"
+              />
+            </div>
+          </div>
+        );
+
+      case 'PSAR':
+        return (
+          <div>
+            <div style={{ marginBottom: '5px' }}>
+              <label>Step: </label>
+              <input
+                type="number"
+                step="0.01"
+                value={indicator.params.step || 0.02}
+                onChange={(e) => updateParam('step', parseFloat(e.target.value) || 0.02)}
+                style={{ width: '60px', padding: '3px', marginLeft: '5px' }}
+                min="0.01"
+                max="1"
+              />
+            </div>
+            <div>
+              <label>Max Step: </label>
+              <input
+                type="number"
+                step="0.1"
+                value={indicator.params.max || 0.2}
+                onChange={(e) => updateParam('max', parseFloat(e.target.value) || 0.2)}
+                style={{ width: '60px', padding: '3px', marginLeft: '5px' }}
+                min="0.1"
+                max="1"
+              />
+            </div>
+          </div>
+        );
+
+      case 'DONCHIAN':
+        return (
+          <div>
+            <label>Period: </label>
+            <input
+              type="number"
+              value={indicator.params.period || 20}
+              onChange={(e) => updateParam('period', parseInt(e.target.value) || 20)}
+              style={{ width: '60px', padding: '3px', marginLeft: '5px' }}
+              min="1"
+              max="100"
+            />
+          </div>
+        );
+
+      case 'HV':
+        return (
+          <div>
+            <label>Period: </label>
+            <input
+              type="number"
+              value={indicator.params.period || 30}
+              onChange={(e) => updateParam('period', parseInt(e.target.value) || 30)}
+              style={{ width: '60px', padding: '3px', marginLeft: '5px' }}
+              min="1"
+              max="100"
+            />
+          </div>
+        );
+
       case 'BB':
         return (
           <div>
@@ -168,7 +441,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ config, setConfig, drawingMode, setDr
                 onChange={(e) => updateParam('period', parseInt(e.target.value) || 20)}
                 style={{ width: '60px', padding: '3px', marginLeft: '5px' }}
                 min="1"
-                max="50"
+                max="100"
               />
             </div>
             <div>
@@ -185,7 +458,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ config, setConfig, drawingMode, setDr
             </div>
           </div>
         );
-      
+
       case 'MACD':
         return (
           <div>
@@ -224,7 +497,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ config, setConfig, drawingMode, setDr
             </div>
           </div>
         );
-      
+
       default:
         return <div>No configuration available for this indicator.</div>;
     }
@@ -409,7 +682,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ config, setConfig, drawingMode, setDr
                 minWidth: '300px'
               }}>
                 <h4 style={{ margin: '0 0 10px 0' }}>Configure {indicator.label}</h4>
-                
+
                 {/* Color Picker */}
                 <div style={{ marginBottom: '10px' }}>
                   <label>Color: </label>
