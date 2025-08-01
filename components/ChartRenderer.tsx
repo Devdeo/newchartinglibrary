@@ -361,7 +361,14 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         case 'HV':
             break;
         case 'VOLUME':
-          renderVolumeIndicator(params, data, renderIndicatorLabel);
+          // Pass the volume scale from the existing histogram
+          const volumeParams = {
+            ...params,
+            volumeScale: d3.scaleLinear()
+              .domain([0, d3.max(data, d => d.volume) as number])
+              .range([height * 0.85, height * 0.75])
+          };
+          renderVolumeIndicator(volumeParams, data, renderIndicatorLabel);
           break;
       }
     });
