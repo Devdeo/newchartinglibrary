@@ -28,7 +28,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     if (!chartRef.current || !svgRef.current) return;
 
     const totalWidth = chartRef.current.clientWidth;
-    const margin = { top: 20, right: 80, bottom: 50, left: 60 };
+    const margin = { top: 20, right: 80, bottom: 50, left: 20 };
     const width = totalWidth - margin.left - margin.right;
     const height = chartRef.current.clientHeight - margin.top - margin.bottom;
 
@@ -65,29 +65,40 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       .attr("width", width)
       .attr("height", height * 0.75);
 
-    // Separate zoom behaviors for X and Y axes
-    const xZoom = d3.zoom<SVGSVGElement, unknown>()
+    // Create a chart area for zoom interactions
+    const chartArea = g.append("rect")
+      .attr("class", "chart-zoom-area")
+      .attr("x", 0)
+      .attr("y", 0)
+      .attr("width", width)
+      .attr("height", height * 0.75)
+      .attr("fill", "transparent")
+      .style("pointer-events", "all");
+
+    // Time axis zoom (default scroll)
+    const timeZoom = d3.zoom<SVGRectElement, unknown>()
       .scaleExtent([0.1, 50])
-      .translateExtent([[-width * 5, -height], [width * 6, height]])
-      .filter((event) => !event.shiftKey)
+      .translateExtent([[-width * 5, 0], [width * 6, height * 0.75]])
+      .filter((event) => !event.shiftKey && !event.ctrlKey && !event.metaKey)
       .on("zoom", (event) => {
         const { transform } = event;
         const newXScale = transform.rescaleX(xScale);
         updateChart(newXScale, yScale);
       });
 
-    const yZoom = d3.zoom<SVGSVGElement, unknown>()
+    // Price axis zoom (shift + scroll)
+    const priceZoom = d3.zoom<SVGRectElement, unknown>()
       .scaleExtent([0.1, 50])
-      .translateExtent([[-width, -height * 5], [width, height * 6]])
-      .filter((event) => event.shiftKey)
+      .translateExtent([[0, -height * 5], [width, height * 6]])
+      .filter((event) => event.shiftKey && !event.ctrlKey && !event.metaKey)
       .on("zoom", (event) => {
         const { transform } = event;
         const newYScale = transform.rescaleY(yScale);
         updateChart(xScale, newYScale);
       });
 
-    // Combined zoom for both axes
-    const combinedZoom = d3.zoom<SVGSVGElement, unknown>()
+    // Combined zoom for both axes (ctrl/cmd + scroll)
+    const combinedZoom = d3.zoom<SVGRectElement, unknown>()
       .scaleExtent([0.1, 50])
       .translateExtent([[-width * 5, -height * 5], [width * 6, height * 6]])
       .filter((event) => event.ctrlKey || event.metaKey)
@@ -98,9 +109,8 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         updateChart(newXScale, newYScale);
       });
 
-    svg.call(xZoom).call(yZoom).call(combinedZoom);
-    zoomRef.current = xZoom;
-    svg.selectAll(".axis").style("pointer-events", "all");
+    chartArea.call(timeZoom).call(priceZoom).call(combinedZoom);
+    zoomRef.current = timeZoom;
 
     updateChart(xScale, yScale);
 
@@ -221,6 +231,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   };
 
   const renderAxes = (g: any, xScale: any, yScale: any, width: number, height: number) => {
+    // Time axis
     g.append("g")
       .attr("class", "axis x-axis")
       .attr("transform", `translate(0,${height * 0.75})`)
@@ -232,29 +243,18 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       .attr("stroke", "#e0e0e0")
       .attr("stroke-width", 0.5);
 
-    const leftAxis = g.append("g")
-      .attr("class", "axis y-axis")
-      .call(d3.axisLeft(yScale)
-        .tickFormat(d => d3.format(".2f")(d))
-        .tickSizeInner(-width)
-        .tickSizeOuter(0));
-
-    leftAxis.selectAll(".tick line")
-      .attr("stroke", "#e0e0e0")
-      .attr("stroke-width", 0.5);
-
-    leftAxis.selectAll(".tick text")
-      .attr("font-size", "11px")
-      .attr("fill", "#666")
-      .style("text-anchor", "end");
-
+    // Only right price axis
     const rightAxis = g.append("g")
       .attr("class", "axis y-axis-right")
       .attr("transform", `translate(${width},0)`)
       .call(d3.axisRight(yScale)
         .tickFormat(d => d3.format(".2f")(d))
-        .tickSizeInner(0)
+        .tickSizeInner(-width)
         .tickSizeOuter(0));
+
+    rightAxis.selectAll(".tick line")
+      .attr("stroke", "#e0e0e0")
+      .attr("stroke-width", 0.5);
 
     rightAxis.selectAll(".tick text")
       .attr("font-size", "11px")
