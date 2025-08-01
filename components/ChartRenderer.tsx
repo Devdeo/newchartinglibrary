@@ -75,33 +75,79 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       .attr("fill", "transparent")
       .style("pointer-events", "all");
 
-    // Time axis zoom (default scroll)
+    // Track touch state for gesture detection
+    let touchState = {
+      touches: [],
+      lastDistance: 0,
+      lastCenter: { x: 0, y: 0 },
+      initialDistance: 0,
+      initialCenter: { x: 0, y: 0 },
+      zoomMode: 'none' // 'time', 'price', 'both'
+    };
+
+    // Helper function to calculate distance between two touches
+    const getTouchDistance = (touch1: any, touch2: any) => {
+      const dx = touch1.clientX - touch2.clientX;
+      const dy = touch1.clientY - touch2.clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    };
+
+    // Helper function to get center point between touches
+    const getTouchCenter = (touch1: any, touch2: any) => {
+      return {
+        x: (touch1.clientX + touch2.clientX) / 2,
+        y: (touch1.clientY + touch2.clientY) / 2
+      };
+    };
+
+    // Time axis zoom (default scroll for desktop, horizontal pinch for mobile)
     const timeZoom = d3.zoom<SVGRectElement, unknown>()
       .scaleExtent([0.1, 50])
       .translateExtent([[-width * 5, 0], [width * 6, height * 0.75]])
-      .filter((event) => !event.shiftKey && !event.ctrlKey && !event.metaKey)
+      .filter((event) => {
+        // For mouse events
+        if (event.type.includes('wheel')) {
+          return !event.shiftKey && !event.ctrlKey && !event.metaKey;
+        }
+        // Allow touch events
+        return event.type.includes('touch') || event.type.includes('pointer');
+      })
       .on("zoom", (event) => {
         const { transform } = event;
         const newXScale = transform.rescaleX(xScale);
         updateChart(newXScale, yScale);
       });
 
-    // Price axis zoom (shift + scroll)
+    // Price axis zoom (shift + scroll for desktop, vertical pinch for mobile)
     const priceZoom = d3.zoom<SVGRectElement, unknown>()
       .scaleExtent([0.1, 50])
       .translateExtent([[0, -height * 5], [width, height * 6]])
-      .filter((event) => event.shiftKey && !event.ctrlKey && !event.metaKey)
+      .filter((event) => {
+        // For mouse events
+        if (event.type.includes('wheel')) {
+          return event.shiftKey && !event.ctrlKey && !event.metaKey;
+        }
+        // Allow touch events
+        return event.type.includes('touch') || event.type.includes('pointer');
+      })
       .on("zoom", (event) => {
         const { transform } = event;
         const newYScale = transform.rescaleY(yScale);
         updateChart(xScale, newYScale);
       });
 
-    // Combined zoom for both axes (ctrl/cmd + scroll)
+    // Combined zoom for both axes (ctrl/cmd + scroll for desktop, two-finger pinch for mobile)
     const combinedZoom = d3.zoom<SVGRectElement, unknown>()
       .scaleExtent([0.1, 50])
       .translateExtent([[-width * 5, -height * 5], [width * 6, height * 6]])
-      .filter((event) => event.ctrlKey || event.metaKey)
+      .filter((event) => {
+        // For mouse events
+        if (event.type.includes('wheel')) {
+          return event.ctrlKey || event.metaKey;
+        }
+        // Allow touch events
+        return event.type.includes('touch') || event.type.includes('pointer');
+      })
       .on("zoom", (event) => {
         const { transform } = event;
         const newXScale = transform.rescaleX(xScale);
@@ -109,6 +155,85 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         updateChart(newXScale, newYScale);
       });
 
+    // Custom touch event handlers for gesture detection
+    chartArea.on('touchstart', function(event) {
+      const touches = event.touches;
+      if (touches.length === 2) {
+        event.preventDefault();
+        
+        const touch1 = touches[0];
+        const touch2 = touches[1];
+        
+        touchState.initialDistance = getTouchDistance(touch1, touch2);
+        touchState.initialCenter = getTouchCenter(touch1, touch2);
+        touchState.lastDistance = touchState.initialDistance;
+        touchState.lastCenter = touchState.initialCenter;
+        
+        // Determine zoom mode based on gesture direction
+        const rect = chartArea.node()!.getBoundingClientRect();
+        const centerX = touchState.initialCenter.x - rect.left;
+        const centerY = touchState.initialCenter.y - rect.top;
+        
+        const dx = Math.abs(touch1.clientX - touch2.clientX);
+        const dy = Math.abs(touch1.clientY - touch2.clientY);
+        
+        // Determine zoom direction based on touch orientation
+        if (dx > dy * 1.5) {
+          touchState.zoomMode = 'time'; // Horizontal gesture
+        } else if (dy > dx * 1.5) {
+          touchState.zoomMode = 'price'; // Vertical gesture
+        } else {
+          touchState.zoomMode = 'both'; // Diagonal gesture
+        }
+      }
+    });
+
+    chartArea.on('touchmove', function(event) {
+      const touches = event.touches;
+      if (touches.length === 2 && touchState.zoomMode !== 'none') {
+        event.preventDefault();
+        
+        const touch1 = touches[0];
+        const touch2 = touches[1];
+        
+        const currentDistance = getTouchDistance(touch1, touch2);
+        const currentCenter = getTouchCenter(touch1, touch2);
+        
+        const scaleFactor = currentDistance / touchState.lastDistance;
+        const rect = chartArea.node()!.getBoundingClientRect();
+        
+        // Convert touch coordinates to chart coordinates
+        const chartX = currentCenter.x - rect.left;
+        const chartY = currentCenter.y - rect.top;
+        
+        // Apply zoom based on detected mode
+        if (touchState.zoomMode === 'time') {
+          const currentTransform = d3.zoomTransform(chartArea.node()!);
+          const newTransform = currentTransform.scale(scaleFactor);
+          timeZoom.transform(chartArea, newTransform);
+        } else if (touchState.zoomMode === 'price') {
+          const currentTransform = d3.zoomTransform(chartArea.node()!);
+          const newTransform = currentTransform.scale(scaleFactor);
+          priceZoom.transform(chartArea, newTransform);
+        } else if (touchState.zoomMode === 'both') {
+          const currentTransform = d3.zoomTransform(chartArea.node()!);
+          const newTransform = currentTransform.scale(scaleFactor);
+          combinedZoom.transform(chartArea, newTransform);
+        }
+        
+        touchState.lastDistance = currentDistance;
+        touchState.lastCenter = currentCenter;
+      }
+    });
+
+    chartArea.on('touchend', function(event) {
+      if (event.touches.length < 2) {
+        touchState.zoomMode = 'none';
+        touchState.touches = [];
+      }
+    });
+
+    // Apply zoom behaviors
     chartArea.call(timeZoom).call(priceZoom).call(combinedZoom);
     zoomRef.current = timeZoom;
 
@@ -346,12 +471,18 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         fontSize: '11px',
         color: '#666',
         zIndex: 100,
-        border: '1px solid #ddd'
+        border: '1px solid #ddd',
+        maxWidth: '200px'
       }}>
+        <div><strong>Desktop:</strong></div>
         <div>🖱️ Drag: Pan chart</div>
         <div>⇧ + Scroll: Zoom price axis</div>
         <div>Scroll: Zoom time axis</div>
         <div>Ctrl/⌘ + Scroll: Zoom both axes</div>
+        <div style={{ marginTop: '8px' }}><strong>Mobile:</strong></div>
+        <div>📱 Horizontal pinch: Zoom time</div>
+        <div>📱 Vertical pinch: Zoom price</div>
+        <div>📱 Diagonal pinch: Zoom both</div>
       </div>
       <svg ref={svgRef} style={{ width: '100%', height: '100%', cursor: drawingMode !== 'none' ? 'crosshair' : 'default' }}>
       </svg>
