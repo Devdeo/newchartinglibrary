@@ -737,7 +737,10 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   };
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+    <div style={{ 
+      position: 'relative', 
+      width: '100%', 
+      height: '100%' }}>
       <div style={{
         position: 'absolute',
         top: '10px',
@@ -751,23 +754,12 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         border: '1px solid #ddd',
         maxWidth: '200px'
       }}>
-        <div><strong>Desktop:</strong></div>
-        <div>🖱️ Drag: Pan chart</div>
-        <div>⇧ + Scroll: Zoom price axis</div>
-        <div>Scroll: Zoom time axis</div>
-        <div>Ctrl/⌘ + Scroll: Zoom both axes</div>
-        <div style={{ marginTop: '8px' }}><strong>Mobile:</strong></div>
-        <div>📱 Horizontal pinch: Zoom time</div>
-        <div>📱 Vertical pinch: Zoom price</div>
-        <div>📱 Diagonal pinch: Zoom both</div>
-        <div style={{ marginTop: '8px' }}><strong>Volume:</strong></div>
-        <div>📊 Green: Bullish volume</div>
-        <div>📊 Red: Bearish volume</div>
-        <div>📊 Orange line: Average volume</div>
+        
       </div>
       <svg ref={svgRef}```text
  style={{ width: '100%', height: '100%', cursor: drawingMode !== 'none' ? 'crosshair' : 'default' }}></svg>
     </div>
+    
   );
 };
 
