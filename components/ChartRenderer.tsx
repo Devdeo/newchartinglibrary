@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
+import * as TI from 'technicalindicators';
 import { CandleData, ChartConfig, OIData } from './TradingChart';
 import { ChartRendererProps, DrawingObject } from './chart/types';
 import { renderCandlesticks, renderLineChart, renderAreaChart, renderBarChart, renderHeikinAshi, renderVolume } from './chart/chartRenderers';
@@ -246,9 +247,10 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     chartArea.call(timeZoom).call(priceZoom).call(combinedZoom);
     zoomRef.current = timeZoom;
 
-    updateChart(xScale, yScale);
+    // Initial render with full indicator setup
+    updateChart(xScale, yScale, undefined, true);
 
-    function updateChart(currentXScale: any, currentYScale: any, currentVolumeScale?: any) {
+    function updateChart(currentXScale: any, currentYScale: any, currentVolumeScale?: any, fullRender = false) {
       const activeVolumeScale = currentVolumeScale || d3.scaleLinear()
         .domain([0, d3.max(data, d => d.volume) as number])
         .range([height * 0.7, height * 0.75]);
@@ -282,9 +284,13 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         renderVolumeHistogram(g, currentXScale, activeVolumeScale, data, width, height);
       }
       
-      // Update indicators with current scales
-      g.selectAll(".indicator").remove();
-      renderIndicators(g, currentXScale, currentYScale, height);
+      // Handle indicator updates - full render on initial load, transform-only on zoom/pan
+      if (fullRender) {
+        g.selectAll(".indicator").remove();
+        renderIndicators(g, currentXScale, currentYScale, height);
+      } else {
+        updateIndicatorTransforms(g, currentXScale, currentYScale, height);
+      }
       
       renderAxes(g, currentXScale, currentYScale, width, height);
       updateCurrentPriceIndicator(g, currentYScale, width);
@@ -297,6 +303,126 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     }
 
     setupDrawingInteractions(svg, g, xScale, yScale, drawingMode, drawingsRef);
+  };
+
+  const updateIndicatorTransforms = (g: any, xScale: any, yScale: any, chartHeight: number) => {
+    const appliedIndicators = config.appliedIndicators || [];
+
+    appliedIndicators.forEach(indicator => {
+      // Update line-based indicators (SMA, EMA, WMA, BB lines)
+      if (['SMA', 'EMA', 'WMA'].includes(indicator.type)) {
+        g.selectAll(`.${indicator.type.toLowerCase()}-${indicator.id}`)
+          .attr("d", d3.line<any>()
+            .x(d => xScale(d.date))
+            .y(d => yScale(d.value))
+            .curve(d3.curveMonotoneX));
+      }
+
+      // Update Bollinger Bands
+      if (indicator.type === 'BB') {
+        const line = d3.line<any>()
+          .x(d => xScale(d.date))
+          .y(d => yScale(d.value))
+          .curve(d3.curveMonotoneX);
+        
+        g.selectAll(`.bb-upper-${indicator.id}`)
+          .attr("d", line);
+        g.selectAll(`.bb-middle-${indicator.id}`)
+          .attr("d", line);
+        g.selectAll(`.bb-lower-${indicator.id}`)
+          .attr("d", line);
+      }
+
+      // Update RSI - need to recalculate position since it has its own scale
+      if (indicator.type === 'RSI') {
+        const rsiHeight = 80;
+        const rsiY = yScale.range()[0] + 200;
+        const rsiScale = d3.scaleLinear()
+          .domain([0, 100])
+          .range([rsiY + rsiHeight, rsiY]);
+
+        g.selectAll(`.rsi-line-${indicator.id}`)
+          .attr("d", d3.line<any>()
+            .x(d => xScale(d.date))
+            .y(d => rsiScale(d.value))
+            .curve(d3.curveMonotoneX));
+
+        // Update RSI reference lines
+        g.selectAll(".rsi-reference")
+          .attr("x1", xScale.range()[0])
+          .attr("x2", xScale.range()[1]);
+      }
+
+      // Update MACD
+      if (indicator.type === 'MACD') {
+        const macdHeight = 100;
+        const macdY = yScale.range()[0] + 50;
+        
+        // We need to recalculate the MACD extent for the scale
+        const closes = data.map(d => d.close);
+        const fastPeriod = indicator.params.fastPeriod || 12;
+        const slowPeriod = indicator.params.slowPeriod || 26;
+        const signalPeriod = indicator.params.signalPeriod || 9;
+        
+        const macdValues = TI.MACD.calculate({
+          values: closes,
+          fastPeriod,
+          slowPeriod,
+          signalPeriod,
+          SimpleMAOscillator: false,
+          SimpleMASignal: false
+        });
+
+        if (macdValues.length > 0) {
+          const macdExtent = d3.extent(macdValues, (d: any) => Math.max(Math.abs(d.MACD || 0), Math.abs(d.signal || 0), Math.abs(d.histogram || 0)));
+          const macdScale = d3.scaleLinear()
+            .domain([-macdExtent[1], macdExtent[1]])
+            .range([macdY + macdHeight, macdY]);
+
+          g.selectAll(`.macd-line-${indicator.id}`)
+            .attr("d", d3.line<any>()
+              .x(d => xScale(d.date))
+              .y(d => macdScale(d.macd))
+              .curve(d3.curveMonotoneX));
+
+          g.selectAll(`.macd-signal-${indicator.id}`)
+            .attr("d", d3.line<any>()
+              .x(d => xScale(d.date))
+              .y(d => macdScale(d.signal))
+              .curve(d3.curveMonotoneX));
+
+          // Update MACD histogram bars
+          const barWidth = Math.max(1, (xScale.range()[1] - xScale.range()[0]) / data.length * 0.8);
+          g.selectAll(".macd-histogram")
+            .attr("x", d => xScale(d.date) - barWidth / 2)
+            .attr("y", d => d.histogram >= 0 ? macdScale(d.histogram) : macdScale(0))
+            .attr("width", barWidth)
+            .attr("height", d => Math.abs(macdScale(d.histogram) - macdScale(0)));
+
+          // Update zero line
+          g.selectAll(".macd-zero")
+            .attr("x1", xScale.range()[0])
+            .attr("x2", xScale.range()[1])
+            .attr("y1", macdScale(0))
+            .attr("y2", macdScale(0));
+        }
+      }
+
+      // Update Volume indicator
+      if (indicator.type === 'VOLUME') {
+        const volumeScale = d3.scaleLinear()
+          .domain([0, d3.max(data, d => d.volume) as number])
+          .range([chartHeight * 0.85, chartHeight * 0.75]);
+
+        const barWidth = Math.max(1, (xScale.range()[1] - xScale.range()[0]) / data.length * 0.6);
+        
+        g.selectAll(`.volume-ma-bar-${indicator.id}`)
+          .attr("x", d => xScale(d.date) - barWidth / 2)
+          .attr("y", d => volumeScale(d.maValue))
+          .attr("width", barWidth)
+          .attr("height", d => volumeScale.range()[0] - volumeScale(d.maValue));
+      }
+    });
   };
 
   const renderIndicators = (g: any, xScale: any, yScale: any, chartHeight: number) => {
