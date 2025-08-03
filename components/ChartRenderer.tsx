@@ -765,7 +765,9 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         <div>📊 Red: Bearish volume</div>
         <div>📊 Orange line: Average volume</div>
       </div>
-      <svg ref={svgRef}```text
+      <svg ref={svgRef} style={{ width: '100%', height: '100%', cursor: drawingMode !== 'none' ? 'crosshair' : 'default' }}></svg>
+    </div>
+  );```text
  style={{ width: '100%', height: '100%', cursor: drawingMode !== 'none' ? 'crosshair' : 'default' }}>
       </svg>
     </div>
