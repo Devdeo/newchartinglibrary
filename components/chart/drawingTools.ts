@@ -116,19 +116,22 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
     const currentYScale = currentTransform.rescaleY(yScale);
     
     return {
-      drawingWidth: currentXScale.range()[1] * 0.75,
-      drawingHeight: currentYScale.range()[0] * 0.75,
+      drawingWidth: currentXScale.range()[1],
+      drawingHeight: currentYScale.range()[0],
       xScale: currentXScale,
       yScale: currentYScale
     };
   };
 
+  // Remove any existing drawing area
+  g.selectAll(".drawing-area").remove();
+
   const drawingArea = g.append("rect")
     .attr("class", "drawing-area")
     .attr("x", 0)
     .attr("y", 0)
-    .attr("width", xScale.range()[1] * 0.75)
-    .attr("height", yScale.range()[0] * 0.75)
+    .attr("width", xScale.range()[1])
+    .attr("height", yScale.range()[0])
     .attr("fill", "transparent")
     .style("pointer-events", "all")
     .style("cursor", () => drawingMode !== 'none' ? 'crosshair' : 'default');
@@ -137,8 +140,9 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
     if (drawingMode === 'none') return;
 
     event.stopPropagation();
+    event.preventDefault();
 
-    const [x, y] = d3.pointer(event, g.node());
+    const [x, y] = d3.pointer(event, this);
     const bounds = getCurrentDrawingBounds();
     
     if (x < 0 || x > bounds.drawingWidth || y < 0 || y > bounds.drawingHeight) return;
@@ -157,7 +161,7 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
   drawingArea.on("mousemove", function(event: MouseEvent) {
     if (!drawing || !currentDrawing) return;
 
-    const [x, y] = d3.pointer(event, g.node());
+    const [x, y] = d3.pointer(event, this);
     const bounds = getCurrentDrawingBounds();
     
     const constrainedX = Math.max(0, Math.min(x, bounds.drawingWidth));
@@ -170,7 +174,7 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
 
     g.selectAll(".drawing-preview").remove();
     g.selectAll(".drawing-preview-layer").remove();
-    renderDrawingPreview(g, currentDrawing, xScale, yScale);
+    renderDrawingPreview(g, currentDrawing, bounds.xScale, bounds.yScale);
   });
 
   drawingArea.on("mouseup", function() {
@@ -182,10 +186,8 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
     g.selectAll(".drawing-preview").remove();
     g.selectAll(".drawing-preview-layer").remove();
     
-    const currentTransform = d3.zoomTransform(svg.node());
-    const currentXScale = currentTransform.rescaleX(xScale);
-    const currentYScale = currentTransform.rescaleY(yScale);
-    renderDrawings(g, drawingsRef.current, currentXScale, currentYScale);
+    const bounds = getCurrentDrawingBounds();
+    renderDrawings(g, drawingsRef.current, bounds.xScale, bounds.yScale);
     
     currentDrawing = null;
   });

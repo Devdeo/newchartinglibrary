@@ -170,23 +170,23 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       const touches = event.touches;
       if (touches.length === 2) {
         event.preventDefault();
-        
+
         const touch1 = touches[0];
         const touch2 = touches[1];
-        
+
         touchState.initialDistance = getTouchDistance(touch1, touch2);
         touchState.initialCenter = getTouchCenter(touch1, touch2);
         touchState.lastDistance = touchState.initialDistance;
         touchState.lastCenter = touchState.initialCenter;
-        
+
         // Determine zoom mode based on gesture direction
         const rect = chartArea.node()!.getBoundingClientRect();
         const centerX = touchState.initialCenter.x - rect.left;
         const centerY = touchState.initialCenter.y - rect.top;
-        
+
         const dx = Math.abs(touch1.clientX - touch2.clientX);
         const dy = Math.abs(touch1.clientY - touch2.clientY);
-        
+
         // Determine zoom direction based on touch orientation
         if (dx > dy * 1.5) {
           touchState.zoomMode = 'time'; // Horizontal gesture
@@ -202,20 +202,20 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       const touches = event.touches;
       if (touches.length === 2 && touchState.zoomMode !== 'none') {
         event.preventDefault();
-        
+
         const touch1 = touches[0];
         const touch2 = touches[1];
-        
+
         const currentDistance = getTouchDistance(touch1, touch2);
         const currentCenter = getTouchCenter(touch1, touch2);
-        
+
         const scaleFactor = currentDistance / touchState.lastDistance;
         const rect = chartArea.node()!.getBoundingClientRect();
-        
+
         // Convert touch coordinates to chart coordinates
         const chartX = currentCenter.x - rect.left;
         const chartY = currentCenter.y - rect.top;
-        
+
         // Apply zoom based on detected mode
         if (touchState.zoomMode === 'time') {
           const currentTransform = d3.zoomTransform(chartArea.node()!);
@@ -230,7 +230,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           const newTransform = currentTransform.scale(scaleFactor);
           combinedZoom.transform(chartArea, newTransform);
         }
-        
+
         touchState.lastDistance = currentDistance;
         touchState.lastCenter = currentCenter;
       }
@@ -283,7 +283,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       if (data.length > 0 && data[0].volume !== undefined) {
         renderVolumeHistogram(g, currentXScale, activeVolumeScale, data, width, height);
       }
-      
+
       // Handle indicator updates - full render on initial load, transform-only on zoom/pan
       if (fullRender) {
         g.selectAll(".indicator").remove();
@@ -291,7 +291,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       } else {
         updateIndicatorTransforms(g, currentXScale, currentYScale, height);
       }
-      
+
       renderAxes(g, currentXScale, currentYScale, width, height);
       updateCurrentPriceIndicator(g, currentYScale, width);
 
@@ -324,7 +324,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .x(d => xScale(d.date))
           .y(d => yScale(d.value))
           .curve(d3.curveMonotoneX);
-        
+
         g.selectAll(`.bb-upper-${indicator.id}`)
           .attr("d", line);
         g.selectAll(`.bb-middle-${indicator.id}`)
@@ -357,13 +357,13 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       if (indicator.type === 'MACD') {
         const macdHeight = 100;
         const macdY = yScale.range()[0] + 50;
-        
+
         // We need to recalculate the MACD extent for the scale
         const closes = data.map(d => d.close);
         const fastPeriod = indicator.params.fastPeriod || 12;
         const slowPeriod = indicator.params.slowPeriod || 26;
         const signalPeriod = indicator.params.signalPeriod || 9;
-        
+
         const macdValues = TI.MACD.calculate({
           values: closes,
           fastPeriod,
@@ -415,7 +415,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .range([chartHeight * 0.85, chartHeight * 0.75]);
 
         const barWidth = Math.max(1, (xScale.range()[1] - xScale.range()[0]) / data.length * 0.6);
-        
+
         g.selectAll(`.volume-ma-bar-${indicator.id}`)
           .attr("x", d => xScale(d.date) - barWidth / 2)
           .attr("y", d => volumeScale(d.maValue))
@@ -511,9 +511,9 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     g.selectAll(".volume-axis").remove();
     g.selectAll(".avg-volume-line").remove();
     g.selectAll(".avg-volume-label").remove();
-    
+
     const barWidth = Math.max(1, (xScale.range()[1] - xScale.range()[0]) / data.length * 0.8);
-    
+
     // Volume panel background
     g.append("rect")
       .attr("class", "volume-panel-bg")
@@ -544,7 +544,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       .style("cursor", "pointer")
       .on("mouseover", function(event, d) {
         d3.select(this).attr("opacity", 1);
-        
+
         // Tooltip for volume
         const tooltip = d3.select("body").selectAll(".volume-tooltip").data([null]);
         const tooltipEnter = tooltip.enter().append("div")
@@ -557,7 +557,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .style("font-size", "12px")
           .style("pointer-events", "none")
           .style("z-index", "1000");
-        
+
         tooltipEnter.merge(tooltip)
           .html(`
             <div><strong>Volume: ${d.volume.toLocaleString()}</strong></div>
@@ -765,7 +765,8 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         <div>📊 Red: Bearish volume</div>
         <div>📊 Orange line: Average volume</div>
       </div>
-      <svg ref={svgRef} style={{ width: '100%', height: '100%', cursor: drawingMode !== 'none' ? 'crosshair' : 'default' }}>
+      <svg ref={svgRef}```text
+ style={{ width: '100%', height: '100%', cursor: drawingMode !== 'none' ? 'crosshair' : 'default' }}>
       </svg>
     </div>
   );
