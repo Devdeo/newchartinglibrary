@@ -367,7 +367,7 @@ export const renderVolumeIndicator = (params: IndicatorRenderParams, data: Candl
   // Add volume indicator active marker
   g.append("text")
     .attr("class", `indicator volume-indicator-active volume-indicator-active-${id}`)
-    .attr("x", chartWidth - 100)
+    .attr("x", 5)
     .attr("y", height * 0.76)
     .attr("font-size", "10px")
     .attr("font-weight", "bold")

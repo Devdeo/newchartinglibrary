@@ -6,14 +6,14 @@ export const renderIndicatorLabel = (g: any, xScale: any, yScale: any, indicator
 
   const lastValue = indicatorData[indicatorData.length - 1];
   const labelY = customY !== undefined ? customY : yScale(lastValue.value);
-  const labelX = xScale.range()[1] - 100;
+  const labelX = xScale.range()[0] + 5;
 
   const labelGroup = g.append("g")
     .attr("class", `indicator-label indicator-label-${id}`)
     .style("cursor", "pointer");
 
   const labelBg = labelGroup.append("rect")
-    .attr("x", labelX - 5)
+    .attr("x", labelX)
     .attr("y", labelY - 12)
     .attr("width", 95)
     .attr("height", 20)
@@ -24,7 +24,7 @@ export const renderIndicatorLabel = (g: any, xScale: any, yScale: any, indicator
     .attr("opacity", 0.8);
 
   const labelText_element = labelGroup.append("text")
-    .attr("x", labelX)
+    .attr("x", labelX + 5)
     .attr("y", labelY - 2)
     .attr("dy", "0.35em")
     .attr("fill", color)
