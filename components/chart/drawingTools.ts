@@ -229,7 +229,15 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
     const svgNode = svg.node();
     if (!svgNode) return null;
     
-    const currentTransform = d3.zoomTransform(svgNode);
+    // Try to get current transform from the chart area or use identity transform
+    let currentTransform;
+    try {
+      const zoomArea = g.select('.chart-zoom-area').node();
+      currentTransform = zoomArea ? d3.zoomTransform(zoomArea) : d3.zoomIdentity;
+    } catch (e) {
+      currentTransform = d3.zoomIdentity;
+    }
+    
     const currentXScale = currentTransform.rescaleX(xScale);
     const currentYScale = currentTransform.rescaleY(yScale);
     
@@ -265,7 +273,7 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
     const [x, y] = d3.pointer(event, this);
     const bounds = getCurrentDrawingBounds();
     
-    if (!bounds || x < 0 || x > bounds.drawingWidth || y < 0 || y > bounds.drawingHeight) return;
+    if (!bounds) return;
 
     drawing = true;
     const dateX = bounds.xScale.invert(x);
@@ -276,6 +284,8 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
       start: { x: dateX, y: priceY },
       end: { x: dateX, y: priceY }
     };
+
+    console.log('Drawing started:', currentDrawing);
   });
 
   drawingArea.on("mousemove", function(event: MouseEvent) {
@@ -308,13 +318,15 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
     drawing = false;
     
     // Only add drawing if there's actual movement
-    const startX = currentDrawing.start.x.getTime();
-    const endX = currentDrawing.end.x.getTime();
+    const startX = currentDrawing.start.x.getTime ? currentDrawing.start.x.getTime() : currentDrawing.start.x;
+    const endX = currentDrawing.end.x.getTime ? currentDrawing.end.x.getTime() : currentDrawing.end.x;
     const startY = currentDrawing.start.y;
     const endY = currentDrawing.end.y;
     
     if (Math.abs(startX - endX) > 1000 || Math.abs(startY - endY) > 0.01) { // Minimum movement threshold
       drawingsRef.current.push({ ...currentDrawing });
+      console.log('Drawing added:', currentDrawing);
+      console.log('Total drawings:', drawingsRef.current.length);
     }
     
     // Clear preview
