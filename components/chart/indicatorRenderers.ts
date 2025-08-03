@@ -361,10 +361,13 @@ export const renderVolumeIndicator = (params: IndicatorRenderParams, data: Candl
     }
   }
   
+  // Calculate width from xScale range
+  const chartWidth = xScale.range()[1] - xScale.range()[0];
+  
   // Add volume indicator active marker
   g.append("text")
     .attr("class", `indicator volume-indicator-active volume-indicator-active-${id}`)
-    .attr("x", width - 100)
+    .attr("x", chartWidth - 100)
     .attr("y", height * 0.76)
     .attr("font-size", "10px")
     .attr("font-weight", "bold")
