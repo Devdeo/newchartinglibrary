@@ -768,7 +768,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       <svg ref={svgRef} style={{ width: '100%', height: '100%', cursor: drawingMode !== 'none' ? 'crosshair' : 'default' }}></svg>
     </div>
   );
-  );
+  
 };
 
 export default ChartRenderer;
