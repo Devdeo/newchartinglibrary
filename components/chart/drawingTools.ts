@@ -221,6 +221,9 @@ export const renderVerticalLine = (g: any, drawing: any, xScale: any, yScale: an
 };
 
 export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: any, drawingMode: string, drawingsRef: React.MutableRefObject<DrawingObject[]>) => {
+  // Calculate width and height from scale ranges
+  const width = xScale.range()[1] - xScale.range()[0];
+  const height = yScale.range()[0] - yScale.range()[1];
   let drawing = false;
   let currentDrawing: any = null;
   let selectedDrawing: DrawingObject | null = null;
