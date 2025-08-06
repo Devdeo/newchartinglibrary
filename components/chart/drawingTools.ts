@@ -327,8 +327,27 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
 
     svg.style("cursor", "crosshair");
     
-    // Use event delegation for drawing interactions
-    svg.on("mousedown.drawing", function(event: MouseEvent) {
+    // Clear any existing drawing handlers to prevent conflicts
+    svg.on("click.drawing", null);
+    svg.on("mousedown.drawing", null);
+    svg.on("mousemove.drawing", null);
+    svg.on("mouseup.drawing", null);
+    
+    // Create a dedicated drawing interaction layer that doesn't interfere with zoom
+    g.selectAll(".drawing-interaction-layer").remove();
+    
+    const drawingInteractionLayer = g.append("rect")
+      .attr("class", "drawing-interaction-layer")
+      .attr("x", 0)
+      .attr("y", 0)
+      .attr("width", width)
+      .attr("height", height * 0.75)
+      .attr("fill", "transparent")
+      .style("pointer-events", "all")
+      .style("cursor", "crosshair");
+    
+    // Use the dedicated drawing layer for drawing interactions
+    drawingInteractionLayer.on("mousedown", function(event: MouseEvent) {
       const [x, y] = d3.pointer(event, g.node());
       const bounds = getCurrentDrawingBounds();
 
@@ -356,7 +375,7 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
       console.log('Drawing started:', currentDrawing);
     });
 
-    svg.on("mousemove.drawing", function(event: MouseEvent) {
+    drawingInteractionLayer.on("mousemove", function(event: MouseEvent) {
       if (!drawing || !currentDrawing) return;
 
       const [x, y] = d3.pointer(event, g.node());
@@ -377,7 +396,7 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
       renderDrawingPreview(g, currentDrawing, bounds.xScale, bounds.yScale);
     });
 
-    svg.on("mouseup.drawing", function() {
+    drawingInteractionLayer.on("mouseup", function() {
       if (!drawing || !currentDrawing) return;
 
       drawing = false;
@@ -403,9 +422,6 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
 
       currentDrawing = null;
     });
-
-    // Clear selection handlers
-    svg.on("click.drawing", null);
   }
 
   // Add keyboard support for deleting selected drawings
