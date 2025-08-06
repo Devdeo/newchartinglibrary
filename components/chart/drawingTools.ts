@@ -1,4 +1,3 @@
-
 import * as d3 from 'd3';
 import { DrawingObject } from './types';
 
@@ -38,7 +37,7 @@ export const renderFibonacci = (g: any, drawing: any, xScale: any, yScale: any) 
 
   fibLevels.forEach((level, i) => {
     const y = startY + diff * level;
-    
+
     g.append("line")
       .attr("class", "drawing fibonacci")
       .attr("x1", xScale(drawing.start.x))
@@ -63,12 +62,12 @@ export const renderFibonacci = (g: any, drawing: any, xScale: any, yScale: any) 
 export const renderDrawingPreview = (g: any, drawing: any, xScale: any, yScale: any) => {
   // Clear any existing preview
   g.selectAll(".drawing-preview-layer").remove();
-  
+
   const previewLayer = g.append("g")
     .attr("class", "drawing-preview-layer")
     .style("pointer-events", "none")
     .attr("clip-path", "url(#chart-clip)");
-  
+
   switch (drawing.type) {
     case 'line':
       previewLayer.append("line")
@@ -149,14 +148,14 @@ export const renderDrawingPreview = (g: any, drawing: any, xScale: any, yScale: 
 export const renderDrawings = (g: any, drawings: DrawingObject[], xScale: any, yScale: any) => {
   g.selectAll(".drawing").remove();
   g.selectAll(".drawings-layer").remove();
-  
+
   if (drawings.length === 0) return;
-  
+
   const drawingsLayer = g.append("g")
     .attr("class", "drawings-layer")
     .attr("clip-path", "url(#chart-clip)")
     .style("pointer-events", "all");
-  
+
   drawings.forEach(drawing => {
     switch (drawing.type) {
       case 'line':
@@ -224,11 +223,12 @@ export const renderVerticalLine = (g: any, drawing: any, xScale: any, yScale: an
 export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: any, drawingMode: string, drawingsRef: React.MutableRefObject<DrawingObject[]>) => {
   let drawing = false;
   let currentDrawing: any = null;
+  let selectedDrawing: DrawingObject | null = null; // Keep track of the currently selected drawing
 
   const getCurrentDrawingBounds = () => {
     const svgNode = svg.node();
     if (!svgNode) return null;
-    
+
     // Try to get current transform from the chart area or use identity transform
     let currentTransform;
     try {
@@ -237,10 +237,10 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
     } catch (e) {
       currentTransform = d3.zoomIdentity;
     }
-    
+
     const currentXScale = currentTransform.rescaleX(xScale);
     const currentYScale = currentTransform.rescaleY(yScale);
-    
+
     return {
       drawingWidth: currentXScale.range()[1],
       drawingHeight: currentYScale.range()[0],
@@ -252,8 +252,7 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
   // Remove any existing drawing area
   g.selectAll(".drawing-area").remove();
 
-  if (drawingMode === 'none') return;
-
+  // Setup drawing area for creating new drawings
   const drawingArea = g.append("rect")
     .attr("class", "drawing-area")
     .attr("x", 0)
@@ -261,94 +260,302 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
     .attr("width", xScale.range()[1])
     .attr("height", yScale.range()[0] * 0.75) // Only cover the main chart area, not volume
     .attr("fill", "transparent")
-    .style("pointer-events", "all")
-    .style("cursor", "crosshair");
+    .style("pointer-events", "all");
 
-  drawingArea.on("mousedown", function(event: MouseEvent) {
-    if (drawingMode === 'none') return;
+  // Setup click events for selecting drawings when in 'none' mode
+  if (drawingMode === 'none') {
+    drawingArea.style("cursor", "default"); // Change cursor when in select mode
+    drawingArea.on("click", function(event: MouseEvent) {
+      event.stopPropagation();
+      const [x, y] = d3.pointer(event, this);
+      const bounds = getCurrentDrawingBounds();
 
-    event.stopPropagation();
-    event.preventDefault();
+      if (!bounds) return;
 
-    const [x, y] = d3.pointer(event, this);
-    const bounds = getCurrentDrawingBounds();
-    
-    if (!bounds) return;
+      let foundDrawing = null;
+      // Iterate over drawings in reverse to select the topmost one
+      for (let i = drawingsRef.current.length - 1; i >= 0; i--) {
+        const drawing = drawingsRef.current[i];
+        if (isPointOnDrawing(x, y, drawing, bounds.xScale, bounds.yScale)) {
+          foundDrawing = drawing;
+          break;
+        }
+      }
 
-    drawing = true;
-    const dateX = bounds.xScale.invert(x);
-    const priceY = bounds.yScale.invert(y);
+      selectedDrawing = foundDrawing;
+      clearDrawingSelection(g); // Clear previous selection
+      if (selectedDrawing) {
+        highlightSelectedDrawing(g, selectedDrawing, bounds.xScale, bounds.yScale);
+      }
+    });
+  } else {
+    drawingArea.style("cursor", "crosshair");
+    drawingArea.on("mousedown", function(event: MouseEvent) {
+      event.stopPropagation();
+      event.preventDefault();
 
-    currentDrawing = {
-      type: drawingMode,
-      start: { x: dateX, y: priceY },
-      end: { x: dateX, y: priceY }
-    };
+      const [x, y] = d3.pointer(event, this);
+      const bounds = getCurrentDrawingBounds();
 
-    console.log('Drawing started:', currentDrawing);
-  });
+      if (!bounds) return;
 
-  drawingArea.on("mousemove", function(event: MouseEvent) {
-    if (!drawing || !currentDrawing || drawingMode === 'none') return;
+      drawing = true;
+      const dateX = bounds.xScale.invert(x);
+      const priceY = bounds.yScale.invert(y);
 
-    const [x, y] = d3.pointer(event, this);
-    const bounds = getCurrentDrawingBounds();
-    
-    if (!bounds) return;
-    
-    const constrainedX = Math.max(0, Math.min(x, bounds.drawingWidth));
-    const constrainedY = Math.max(0, Math.min(y, bounds.drawingHeight));
-    
-    const dateX = bounds.xScale.invert(constrainedX);
-    const priceY = bounds.yScale.invert(constrainedY);
+      currentDrawing = {
+        type: drawingMode,
+        start: { x: dateX, y: priceY },
+        end: { x: dateX, y: priceY }
+      };
 
-    currentDrawing.end = { x: dateX, y: priceY };
+      console.log('Drawing started:', currentDrawing);
+    });
 
-    // Clear previous preview
-    g.selectAll(".drawing-preview").remove();
-    g.selectAll(".drawing-preview-layer").remove();
-    
-    // Render new preview
-    renderDrawingPreview(g, currentDrawing, bounds.xScale, bounds.yScale);
-  });
+    drawingArea.on("mousemove", function(event: MouseEvent) {
+      if (!drawing || !currentDrawing) return;
 
-  drawingArea.on("mouseup", function() {
-    if (!drawing || !currentDrawing) return;
+      const [x, y] = d3.pointer(event, this);
+      const bounds = getCurrentDrawingBounds();
 
-    drawing = false;
-    
-    // Only add drawing if there's actual movement
-    const startX = currentDrawing.start.x.getTime ? currentDrawing.start.x.getTime() : currentDrawing.start.x;
-    const endX = currentDrawing.end.x.getTime ? currentDrawing.end.x.getTime() : currentDrawing.end.x;
-    const startY = currentDrawing.start.y;
-    const endY = currentDrawing.end.y;
-    
-    if (Math.abs(startX - endX) > 1000 || Math.abs(startY - endY) > 0.01) { // Minimum movement threshold
-      drawingsRef.current.push({ ...currentDrawing });
-      console.log('Drawing added:', currentDrawing);
-      console.log('Total drawings:', drawingsRef.current.length);
-    }
-    
-    // Clear preview
-    g.selectAll(".drawing-preview").remove();
-    g.selectAll(".drawing-preview-layer").remove();
-    
-    // Render all drawings
-    const bounds = getCurrentDrawingBounds();
-    if (bounds) {
-      renderDrawings(g, drawingsRef.current, bounds.xScale, bounds.yScale);
-    }
-    
-    currentDrawing = null;
-  });
+      if (!bounds) return;
 
-  // Handle mouse leave to cancel drawing
-  drawingArea.on("mouseleave", function() {
-    if (drawing) {
-      drawing = false;
+      const constrainedX = Math.max(0, Math.min(x, bounds.drawingWidth));
+      const constrainedY = Math.max(0, Math.min(y, bounds.drawingHeight));
+
+      const dateX = bounds.xScale.invert(constrainedX);
+      const priceY = bounds.yScale.invert(constrainedY);
+
+      currentDrawing.end = { x: dateX, y: priceY };
+
+      // Clear previous preview and render new preview
       g.selectAll(".drawing-preview").remove();
       g.selectAll(".drawing-preview-layer").remove();
+      renderDrawingPreview(g, currentDrawing, bounds.xScale, bounds.yScale);
+    });
+
+    drawingArea.on("mouseup", function() {
+      if (!drawing || !currentDrawing) return;
+
+      drawing = false;
+
+      const startX = currentDrawing.start.x.getTime ? currentDrawing.start.x.getTime() : currentDrawing.start.x;
+      const endX = currentDrawing.end.x.getTime ? currentDrawing.end.x.getTime() : currentDrawing.end.x;
+      const startY = currentDrawing.start.y;
+      const endY = currentDrawing.end.y;
+
+      if (Math.abs(startX - endX) > 1000 || Math.abs(startY - endY) > 0.01) {
+        drawingsRef.current.push({ ...currentDrawing });
+        console.log('Drawing added:', currentDrawing);
+        console.log('Total drawings:', drawingsRef.current.length);
+      }
+
+      g.selectAll(".drawing-preview").remove();
+      g.selectAll(".drawing-preview-layer").remove();
+
+      const bounds = getCurrentDrawingBounds();
+      if (bounds) {
+        renderDrawings(g, drawingsRef.current, bounds.xScale, bounds.yScale);
+      }
+
       currentDrawing = null;
-    }
+    });
+
+    // Handle mouse leave to cancel drawing
+    drawingArea.on("mouseleave", function() {
+      if (drawing) {
+        drawing = false;
+        g.selectAll(".drawing-preview").remove();
+        g.selectAll(".drawing-preview-layer").remove();
+        currentDrawing = null;
+      }
+    });
+  }
+
+  // Add keyboard support for deleting selected drawings
+  if (typeof window !== 'undefined') {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (drawingMode === 'none' && selectedDrawing && (event.key === 'Delete' || event.key === 'Backspace')) {
+        const index = drawingsRef.current.indexOf(selectedDrawing);
+        if (index > -1) {
+          drawingsRef.current.splice(index, 1);
+          clearDrawingSelection(g);
+          const bounds = getCurrentDrawingBounds();
+          if (bounds) {
+            renderDrawings(g, drawingsRef.current, bounds.xScale, bounds.yScale);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    // Cleanup function - store it on the drawing area for later removal
+    (drawingArea.node() as any).__keydownHandler = handleKeyDown;
+  }
+};
+
+// Helper function to check if a point is on a drawing
+const isPointOnDrawing = (x: number, y: number, drawing: any, xScale: any, yScale: any): boolean => {
+  const tolerance = 5; // pixels
+
+  switch (drawing.type) {
+    case 'line':
+      return isPointOnLine(x, y, 
+        xScale(drawing.start.x), yScale(drawing.start.y),
+        xScale(drawing.end.x), yScale(drawing.end.y), tolerance);
+
+    case 'rectangle':
+      const rectX = Math.min(xScale(drawing.start.x), xScale(drawing.end.x));
+      const rectY = Math.min(yScale(drawing.start.y), yScale(drawing.end.y));
+      const rectWidth = Math.abs(xScale(drawing.end.x) - xScale(drawing.start.x));
+      const rectHeight = Math.abs(yScale(drawing.end.y) - yScale(drawing.start.y));
+
+      return x >= rectX && x <= rectX + rectWidth && y >= rectY && y <= rectY + rectHeight;
+
+    case 'circle':
+      const centerX = xScale(drawing.start.x);
+      const centerY = yScale(drawing.start.y);
+      const radius = Math.sqrt(
+        Math.pow(xScale(drawing.end.x) - centerX, 2) + 
+        Math.pow(yScale(drawing.end.y) - centerY, 2)
+      );
+      const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
+
+      return Math.abs(distance - radius) <= tolerance;
+
+    case 'horizontal':
+      const lineY = yScale(drawing.start.y);
+      return Math.abs(y - lineY) <= tolerance;
+
+    case 'vertical':
+      const lineX = xScale(drawing.start.x);
+      return Math.abs(x - lineX) <= tolerance;
+
+    case 'fibonacci':
+      // Check if point is near any of the fibonacci lines
+      const fibLevels = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
+      const startY = yScale(drawing.start.y);
+      const endY = yScale(drawing.end.y);
+      const diff = endY - startY;
+
+      for (const level of fibLevels) {
+        const fibY = startY + diff * level;
+        if (Math.abs(y - fibY) <= tolerance) {
+          return true;
+        }
+      }
+      return false;
+
+    default:
+      return false;
+  }
+};
+
+// Helper function to check if point is on a line
+const isPointOnLine = (px: number, py: number, x1: number, y1: number, x2: number, y2: number, tolerance: number): boolean => {
+  const lineLength = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+  const distanceToStart = Math.sqrt(Math.pow(px - x1, 2) + Math.pow(py - y1, 2));
+  const distanceToEnd = Math.sqrt(Math.pow(px - x2, 2) + Math.pow(py - y2, 2));
+
+  // Check if point is approximately on the line using the triangle inequality
+  return Math.abs(distanceToStart + distanceToEnd - lineLength) <= tolerance;
+};
+
+// Function to highlight selected drawing
+const highlightSelectedDrawing = (g: any, drawing: any, xScale: any, yScale: any) => {
+  clearDrawingSelection(g);
+
+  const selectionLayer = g.append("g")
+    .attr("class", "drawing-selection-layer")
+    .style("pointer-events", "none");
+
+  switch (drawing.type) {
+    case 'line':
+      selectionLayer.append("line")
+        .attr("class", "drawing-selection")
+        .attr("x1", xScale(drawing.start.x))
+        .attr("y1", yScale(drawing.start.y))
+        .attr("x2", xScale(drawing.end.x))
+        .attr("y2", yScale(drawing.end.y))
+        .attr("stroke", "#2196F3")
+        .attr("stroke-width", 4)
+        .attr("opacity", 0.6);
+      break;
+
+    case 'rectangle':
+      const x = Math.min(xScale(drawing.start.x), xScale(drawing.end.x));
+      const y = Math.min(yScale(drawing.start.y), yScale(drawing.end.y));
+      const width = Math.abs(xScale(drawing.end.x) - xScale(drawing.start.x));
+      const height = Math.abs(yScale(drawing.end.y) - yScale(drawing.start.y));
+
+      selectionLayer.append("rect")
+        .attr("class", "drawing-selection")
+        .attr("x", x)
+        .attr("y", y)
+        .attr("width", width)
+        .attr("height", height)
+        .attr("fill", "none")
+        .attr("stroke", "#2196F3")
+        .attr("stroke-width", 3)
+        .attr("opacity", 0.8);
+      break;
+
+    case 'circle':
+      const centerX = xScale(drawing.start.x);
+      const centerY = yScale(drawing.start.y);
+      const radius = Math.sqrt(
+        Math.pow(xScale(drawing.end.x) - centerX, 2) + 
+        Math.pow(yScale(drawing.end.y) - centerY, 2)
+      );
+
+      selectionLayer.append("circle")
+        .attr("class", "drawing-selection")
+        .attr("cx", centerX)
+        .attr("cy", centerY)
+        .attr("r", radius)
+        .attr("fill", "none")
+        .attr("stroke", "#2196F3")
+        .attr("stroke-width", 3)
+        .attr("opacity", 0.8);
+      break;
+  }
+
+  // Add selection indicators (small squares at key points)
+  addSelectionHandles(selectionLayer, drawing, xScale, yScale);
+};
+
+// Function to add selection handles
+const addSelectionHandles = (layer: any, drawing: any, xScale: any, yScale: any) => {
+  const handleSize = 6;
+
+  const handles = [];
+
+  switch (drawing.type) {
+    case 'line':
+    case 'rectangle':
+    case 'circle':
+      handles.push(
+        { x: xScale(drawing.start.x), y: yScale(drawing.start.y) },
+        { x: xScale(drawing.end.x), y: yScale(drawing.end.y) }
+      );
+      break;
+  }
+
+  handles.forEach(handle => {
+    layer.append("rect")
+      .attr("class", "selection-handle")
+      .attr("x", handle.x - handleSize / 2)
+      .attr("y", handle.y - handleSize / 2)
+      .attr("width", handleSize)
+      .attr("height", handleSize)
+      .attr("fill", "#2196F3")
+      .attr("stroke", "white")
+      .attr("stroke-width", 1);
   });
+};
+
+// Function to clear drawing selection
+const clearDrawingSelection = (g: any) => {
+  g.selectAll(".drawing-selection-layer").remove();
 };

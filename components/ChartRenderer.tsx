@@ -305,6 +305,19 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     setupDrawingInteractions(svg, g, xScale, yScale, drawingMode, drawingsRef);
   };
 
+  // Cleanup effect for event listeners
+  useEffect(() => {
+    return () => {
+      // Cleanup any global event listeners when component unmounts or drawing mode changes
+      if (typeof window !== 'undefined') {
+        const drawingArea = d3.select('.drawing-area').node();
+        if (drawingArea && (drawingArea as any).__keydownHandler) {
+          window.removeEventListener('keydown', (drawingArea as any).__keydownHandler);
+        }
+      }
+    };
+  }, [drawingMode]);
+
   const updateIndicatorTransforms = (g: any, xScale: any, yScale: any, chartHeight: number) => {
     const appliedIndicators = config.appliedIndicators || [];
 
