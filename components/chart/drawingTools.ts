@@ -230,6 +230,15 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
   let isDrawing = false;
   let currentDrawing: any = null;
   let selectedDrawing: DrawingObject | null = null;
+  
+  // Always clear any existing interactions first
+  g.selectAll(".drawing-interaction-layer").remove();
+  g.selectAll(".drawing-selection-overlay").remove();
+  g.selectAll(".drawing-selection-layer").remove();
+  svg.on("mousedown.drawing", null);
+  svg.on("mousemove.drawing", null); 
+  svg.on("mouseup.drawing", null);
+  svg.on("click.drawing", null);
 
   // Get current scales with zoom transforms
   const getCurrentScales = () => {
@@ -244,14 +253,6 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
       return { xScale, yScale };
     }
   };
-
-  // Clean up all existing interaction layers and event handlers
-  g.selectAll(".drawing-interaction-layer").remove();
-  g.selectAll(".drawing-selection-overlay").remove();
-  svg.on("mousedown.drawing", null);
-  svg.on("mousemove.drawing", null);
-  svg.on("mouseup.drawing", null);
-  svg.on("click.drawing", null);
 
   // Get chart zoom area for proper interaction management
   const chartZoomArea = g.select('.chart-zoom-area');
@@ -315,6 +316,11 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
     // Drawing mode - disable zoom and enable drawing
     selectedDrawing = null;
     clearDrawingSelection(g);
+    
+    // Clear any existing drawing interaction layers and overlays
+    g.selectAll(".drawing-interaction-layer").remove();
+    g.selectAll(".drawing-selection-overlay").remove();
+    
     svg.style("cursor", "crosshair");
     
     // Temporarily disable zoom interactions by reducing pointer events

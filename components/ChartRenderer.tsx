@@ -311,6 +311,35 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     }
   };
 
+  // Re-setup drawing interactions when drawing mode changes
+  useEffect(() => {
+    if (svgRef.current && data.length > 0) {
+      const svg = d3.select(svgRef.current);
+      const g = svg.select('g');
+      if (!g.empty()) {
+        // Get current scales from the chart
+        const width = chartRef.current?.clientWidth || 800;
+        const margin = { top: 20, right: 80, bottom: 50, left: 20 };
+        const chartWidth = width - margin.left - margin.right;
+        
+        const xScale = d3.scaleTime()
+          .domain(d3.extent(data, d => d.date) as [Date, Date])
+          .range([0, chartWidth]);
+          
+        const allPrices = data.flatMap(d => [d.open, d.high, d.low, d.close]);
+        const priceExtent = d3.extent(allPrices) as [number, number];
+        const pricePadding = (priceExtent[1] - priceExtent[0]) * 0.1;
+        const height = (chartRef.current?.clientHeight || 600) - margin.top - margin.bottom;
+        const yScale = d3.scaleLinear()
+          .domain([priceExtent[0] - pricePadding, priceExtent[1] + pricePadding])
+          .range([height * 0.7, 0]);
+          
+        setupDrawingInteractions(svg, g, xScale, yScale, drawingMode, drawingsRef);
+      }
+    }
+  }, [drawingMode]);
+  };
+
   // Cleanup effect for event listeners
   useEffect(() => {
     return () => {
