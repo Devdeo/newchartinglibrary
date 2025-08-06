@@ -223,7 +223,7 @@ export const renderVerticalLine = (g: any, drawing: any, xScale: any, yScale: an
 export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: any, drawingMode: string, drawingsRef: React.MutableRefObject<DrawingObject[]>) => {
   let drawing = false;
   let currentDrawing: any = null;
-  let selectedDrawing: DrawingObject | null = null; // Keep track of the currently selected drawing
+  let selectedDrawing: DrawingObject | null = null;
 
   const getCurrentDrawingBounds = () => {
     const svgNode = svg.node();
@@ -251,22 +251,34 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
 
   // Remove any existing drawing area
   g.selectAll(".drawing-area").remove();
+  g.selectAll(".drawing-interaction-layer").remove();
 
-  // Setup drawing area for creating new drawings
-  const drawingArea = g.append("rect")
+  // Create a dedicated interaction layer that sits above the chart but below other UI elements
+  const interactionLayer = g.append("g")
+    .attr("class", "drawing-interaction-layer")
+    .style("pointer-events", "all");
+
+  const drawingArea = interactionLayer.append("rect")
     .attr("class", "drawing-area")
     .attr("x", 0)
     .attr("y", 0)
     .attr("width", xScale.range()[1])
-    .attr("height", yScale.range()[0] * 0.75) // Only cover the main chart area, not volume
+    .attr("height", yScale.range()[0] * 0.75)
     .attr("fill", "transparent")
     .style("pointer-events", "all");
 
-  // Setup click events for selecting drawings when in 'none' mode
   if (drawingMode === 'none') {
-    drawingArea.style("cursor", "default"); // Change cursor when in select mode
+    // Select mode - disable zoom behaviors on the chart area to avoid conflicts
+    const chartArea = g.select('.chart-zoom-area');
+    if (chartArea.node()) {
+      chartArea.style("pointer-events", "none");
+    }
+
+    drawingArea.style("cursor", "default");
     drawingArea.on("click", function(event: MouseEvent) {
       event.stopPropagation();
+      event.preventDefault();
+      
       const [x, y] = d3.pointer(event, this);
       const bounds = getCurrentDrawingBounds();
 
@@ -283,13 +295,33 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
       }
 
       selectedDrawing = foundDrawing;
-      clearDrawingSelection(g); // Clear previous selection
+      clearDrawingSelection(g);
       if (selectedDrawing) {
         highlightSelectedDrawing(g, selectedDrawing, bounds.xScale, bounds.yScale);
+        console.log('Drawing selected:', selectedDrawing);
+      } else {
+        console.log('No drawing found at click position');
       }
     });
+
+    // Clear any drawing event handlers
+    drawingArea.on("mousedown", null);
+    drawingArea.on("mousemove", null);
+    drawingArea.on("mouseup", null);
+    drawingArea.on("mouseleave", null);
+
   } else {
+    // Drawing mode - re-enable zoom behaviors
+    const chartArea = g.select('.chart-zoom-area');
+    if (chartArea.node()) {
+      chartArea.style("pointer-events", "all");
+    }
+
+    selectedDrawing = null;
+    clearDrawingSelection(g);
+
     drawingArea.style("cursor", "crosshair");
+    
     drawingArea.on("mousedown", function(event: MouseEvent) {
       event.stopPropagation();
       event.preventDefault();
@@ -328,7 +360,6 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
 
       currentDrawing.end = { x: dateX, y: priceY };
 
-      // Clear previous preview and render new preview
       g.selectAll(".drawing-preview").remove();
       g.selectAll(".drawing-preview-layer").remove();
       renderDrawingPreview(g, currentDrawing, bounds.xScale, bounds.yScale);
@@ -361,7 +392,6 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
       currentDrawing = null;
     });
 
-    // Handle mouse leave to cancel drawing
     drawingArea.on("mouseleave", function() {
       if (drawing) {
         drawing = false;
@@ -370,27 +400,37 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
         currentDrawing = null;
       }
     });
+
+    // Clear selection handlers
+    drawingArea.on("click", null);
   }
 
   // Add keyboard support for deleting selected drawings
   if (typeof window !== 'undefined') {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (drawingMode === 'none' && selectedDrawing && (event.key === 'Delete' || event.key === 'Backspace')) {
+        event.preventDefault();
         const index = drawingsRef.current.indexOf(selectedDrawing);
         if (index > -1) {
           drawingsRef.current.splice(index, 1);
+          selectedDrawing = null;
           clearDrawingSelection(g);
           const bounds = getCurrentDrawingBounds();
           if (bounds) {
             renderDrawings(g, drawingsRef.current, bounds.xScale, bounds.yScale);
           }
+          console.log('Drawing deleted, remaining:', drawingsRef.current.length);
         }
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
+    // Remove existing listener if it exists
+    const existingHandler = (drawingArea.node() as any).__keydownHandler;
+    if (existingHandler) {
+      window.removeEventListener('keydown', existingHandler);
+    }
 
-    // Cleanup function - store it on the drawing area for later removal
+    window.addEventListener('keydown', handleKeyDown);
     (drawingArea.node() as any).__keydownHandler = handleKeyDown;
   }
 };
