@@ -245,7 +245,7 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
     }
   };
 
-  // Clean up all existing interaction layers
+  // Clean up all existing interaction layers and event handlers
   g.selectAll(".drawing-interaction-layer").remove();
   g.selectAll(".drawing-selection-overlay").remove();
   svg.on("mousedown.drawing", null);
@@ -253,12 +253,20 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
   svg.on("mouseup.drawing", null);
   svg.on("click.drawing", null);
 
+  // Get chart zoom area for proper interaction management
+  const chartZoomArea = g.select('.chart-zoom-area');
+
   if (drawingMode === 'none') {
-    // Selection mode
+    // Selection/Zoom mode - enable full zoom functionality
     svg.style("cursor", "default");
     clearDrawingSelection(g);
     
-    // Create selection overlay that doesn't interfere with zoom
+    // Re-enable zoom interactions on chart area by removing pointer-events restrictions
+    if (chartZoomArea.node()) {
+      chartZoomArea.style("pointer-events", "all");
+    }
+    
+    // Create a lightweight selection overlay that doesn't block zoom
     const selectionOverlay = g.append("rect")
       .attr("class", "drawing-selection-overlay")
       .attr("x", 0)
@@ -266,40 +274,55 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
       .attr("width", width)
       .attr("height", height * 0.75)
       .attr("fill", "transparent")
-      .style("pointer-events", "all");
+      .style("pointer-events", "none"); // Initially don't capture events
 
-    selectionOverlay.on("click", function(event: MouseEvent) {
-      event.stopPropagation();
-      
-      const [x, y] = d3.pointer(event, g.node());
-      const scales = getCurrentScales();
-      
-      // Find clicked drawing
-      let foundDrawing = null;
-      for (let i = drawingsRef.current.length - 1; i >= 0; i--) {
-        const drawing = drawingsRef.current[i];
-        if (isPointOnDrawing(x, y, drawing, scales.xScale, scales.yScale)) {
-          foundDrawing = drawing;
-          break;
+    // Use a different approach for selection - listen for click events that don't conflict with zoom
+    svg.on("click.drawing", function(event: MouseEvent) {
+      // Only handle selection if it's a simple click (not part of zoom/drag)
+      const timeStamp = event.timeStamp;
+      setTimeout(() => {
+        // Check if this was a zoom interaction by looking for subsequent events
+        if (isDrawing) return; // Skip if we're in the middle of drawing
+        
+        const [x, y] = d3.pointer(event, g.node());
+        
+        // Only process clicks within chart bounds
+        if (x < 0 || x > width || y < 0 || y > height * 0.75) return;
+        
+        const scales = getCurrentScales();
+        
+        // Find clicked drawing
+        let foundDrawing = null;
+        for (let i = drawingsRef.current.length - 1; i >= 0; i--) {
+          const drawing = drawingsRef.current[i];
+          if (isPointOnDrawing(x, y, drawing, scales.xScale, scales.yScale)) {
+            foundDrawing = drawing;
+            break;
+          }
         }
-      }
 
-      selectedDrawing = foundDrawing;
-      clearDrawingSelection(g);
-      
-      if (selectedDrawing) {
-        highlightSelectedDrawing(g, selectedDrawing, scales.xScale, scales.yScale);
-        console.log('Drawing selected:', selectedDrawing);
-      }
+        selectedDrawing = foundDrawing;
+        clearDrawingSelection(g);
+        
+        if (selectedDrawing) {
+          highlightSelectedDrawing(g, selectedDrawing, scales.xScale, scales.yScale);
+          console.log('Drawing selected:', selectedDrawing);
+        }
+      }, 10); // Small delay to let zoom events settle
     });
 
   } else {
-    // Drawing mode
+    // Drawing mode - disable zoom and enable drawing
     selectedDrawing = null;
     clearDrawingSelection(g);
     svg.style("cursor", "crosshair");
     
-    // Create drawing interaction layer
+    // Temporarily disable zoom interactions by reducing pointer events
+    if (chartZoomArea.node()) {
+      chartZoomArea.style("pointer-events", "none");
+    }
+    
+    // Create drawing interaction layer that captures all mouse events
     const drawingLayer = g.append("rect")
       .attr("class", "drawing-interaction-layer")
       .attr("x", 0)

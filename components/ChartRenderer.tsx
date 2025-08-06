@@ -83,7 +83,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       .attr("width", width)
       .attr("height", height * 0.85)
       .attr("fill", "transparent")
-      .style("pointer-events", "all");
+      .style("pointer-events", drawingMode === 'none' ? "all" : "none");
 
     // Track touch state for gesture detection
     let touchState = {
@@ -303,6 +303,12 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     }
 
     setupDrawingInteractions(svg, g, xScale, yScale, drawingMode, drawingsRef);
+    
+    // Ensure zoom area pointer events are correctly set based on drawing mode
+    const chartZoomArea = g.select('.chart-zoom-area');
+    if (chartZoomArea.node()) {
+      chartZoomArea.style("pointer-events", drawingMode === 'none' ? "all" : "none");
+    }
   };
 
   // Cleanup effect for event listeners
