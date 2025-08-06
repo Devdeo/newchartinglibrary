@@ -338,7 +338,6 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       }
     }
   }, [drawingMode]);
-  };
 
   // Cleanup effect for event listeners
   useEffect(() => {
