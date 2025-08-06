@@ -1,3 +1,4 @@
+
 import * as d3 from 'd3';
 import { DrawingObject } from './types';
 
@@ -154,7 +155,7 @@ export const renderDrawings = (g: any, drawings: DrawingObject[], xScale: any, y
   const drawingsLayer = g.append("g")
     .attr("class", "drawings-layer")
     .attr("clip-path", "url(#chart-clip)")
-    .style("pointer-events", "none"); // Don't interfere with zoom/selection
+    .style("pointer-events", "none");
 
   drawings.forEach(drawing => {
     switch (drawing.type) {
@@ -224,48 +225,40 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
   // Calculate width and height from scale ranges
   const width = xScale.range()[1] - xScale.range()[0];
   const height = yScale.range()[0] - yScale.range()[1];
-  let drawing = false;
+  
+  // Drawing state
+  let isDrawing = false;
   let currentDrawing: any = null;
   let selectedDrawing: DrawingObject | null = null;
 
-  const getCurrentDrawingBounds = () => {
-    const svgNode = svg.node();
-    if (!svgNode) return null;
-
-    // Try to get current transform from the chart area or use identity transform
-    let currentTransform;
+  // Get current scales with zoom transforms
+  const getCurrentScales = () => {
     try {
-      const zoomArea = g.select('.chart-zoom-area').node();
-      currentTransform = zoomArea ? d3.zoomTransform(zoomArea) : d3.zoomIdentity;
+      const chartArea = g.select('.chart-zoom-area').node();
+      const currentTransform = chartArea ? d3.zoomTransform(chartArea) : d3.zoomIdentity;
+      return {
+        xScale: currentTransform.rescaleX(xScale),
+        yScale: currentTransform.rescaleY(yScale)
+      };
     } catch (e) {
-      currentTransform = d3.zoomIdentity;
+      return { xScale, yScale };
     }
-
-    const currentXScale = currentTransform.rescaleX(xScale);
-    const currentYScale = currentTransform.rescaleY(yScale);
-
-    return {
-      drawingWidth: currentXScale.range()[1],
-      drawingHeight: currentYScale.range()[0],
-      xScale: currentXScale,
-      yScale: currentYScale
-    };
   };
 
-  // Remove any existing drawing area
-  g.selectAll(".drawing-area").remove();
+  // Clean up all existing interaction layers
   g.selectAll(".drawing-interaction-layer").remove();
-
-  // Always keep chart zoom functionality enabled
-  const chartArea = g.select('.chart-zoom-area');
-  if (chartArea.node()) {
-    chartArea.style("pointer-events", "all");
-  }
+  g.selectAll(".drawing-selection-overlay").remove();
+  svg.on("mousedown.drawing", null);
+  svg.on("mousemove.drawing", null);
+  svg.on("mouseup.drawing", null);
+  svg.on("click.drawing", null);
 
   if (drawingMode === 'none') {
-    // Create a separate transparent overlay for drawing selection that doesn't interfere with zoom
-    g.selectAll(".drawing-selection-overlay").remove();
+    // Selection mode
+    svg.style("cursor", "default");
+    clearDrawingSelection(g);
     
+    // Create selection overlay that doesn't interfere with zoom
     const selectionOverlay = g.append("rect")
       .attr("class", "drawing-selection-overlay")
       .attr("x", 0)
@@ -273,29 +266,19 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
       .attr("width", width)
       .attr("height", height * 0.75)
       .attr("fill", "transparent")
-      .style("pointer-events", "all")
-      .style("cursor", "pointer");
+      .style("pointer-events", "all");
 
-    // Handle selection on the overlay, not the main svg
     selectionOverlay.on("click", function(event: MouseEvent) {
-      // Prevent this click from bubbling to chart zoom handlers
       event.stopPropagation();
       
       const [x, y] = d3.pointer(event, g.node());
-      const bounds = getCurrentDrawingBounds();
-
-      if (!bounds) return;
-
-      // Check if click is within chart area
-      if (x < 0 || x > bounds.drawingWidth || y < 0 || y > bounds.drawingHeight * 0.75) {
-        return;
-      }
-
+      const scales = getCurrentScales();
+      
+      // Find clicked drawing
       let foundDrawing = null;
-      // Iterate over drawings in reverse to select the topmost one
       for (let i = drawingsRef.current.length - 1; i >= 0; i--) {
         const drawing = drawingsRef.current[i];
-        if (isPointOnDrawing(x, y, drawing, bounds.xScale, bounds.yScale)) {
+        if (isPointOnDrawing(x, y, drawing, scales.xScale, scales.yScale)) {
           foundDrawing = drawing;
           break;
         }
@@ -303,40 +286,21 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
 
       selectedDrawing = foundDrawing;
       clearDrawingSelection(g);
+      
       if (selectedDrawing) {
-        highlightSelectedDrawing(g, selectedDrawing, bounds.xScale, bounds.yScale);
+        highlightSelectedDrawing(g, selectedDrawing, scales.xScale, scales.yScale);
         console.log('Drawing selected:', selectedDrawing);
-      } else {
-        console.log('No drawing found at click position');
       }
     });
 
-    // Clear any drawing event handlers from svg
-    svg.on("click.drawing", null);
-    svg.on("mousedown.drawing", null);
-    svg.on("mousemove.drawing", null);
-    svg.on("mouseup.drawing", null);
-
   } else {
-    // Drawing mode - create interaction layer only when actively drawing
+    // Drawing mode
     selectedDrawing = null;
     clearDrawingSelection(g);
-    
-    // Remove selection overlay when switching to drawing mode
-    g.selectAll(".drawing-selection-overlay").remove();
-
     svg.style("cursor", "crosshair");
     
-    // Clear any existing drawing handlers to prevent conflicts
-    svg.on("click.drawing", null);
-    svg.on("mousedown.drawing", null);
-    svg.on("mousemove.drawing", null);
-    svg.on("mouseup.drawing", null);
-    
-    // Create a dedicated drawing interaction layer that doesn't interfere with zoom
-    g.selectAll(".drawing-interaction-layer").remove();
-    
-    const drawingInteractionLayer = g.append("rect")
+    // Create drawing interaction layer
+    const drawingLayer = g.append("rect")
       .attr("class", "drawing-interaction-layer")
       .attr("x", 0)
       .attr("y", 0)
@@ -345,26 +309,21 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
       .attr("fill", "transparent")
       .style("pointer-events", "all")
       .style("cursor", "crosshair");
-    
-    // Use the dedicated drawing layer for drawing interactions
-    drawingInteractionLayer.on("mousedown", function(event: MouseEvent) {
-      const [x, y] = d3.pointer(event, g.node());
-      const bounds = getCurrentDrawingBounds();
 
-      if (!bounds) return;
-
-      // Check if click is within chart drawing area
-      if (x < 0 || x > bounds.drawingWidth || y < 0 || y > bounds.drawingHeight * 0.75) {
-        return;
-      }
-
-      // Prevent zoom from starting when we're drawing
+    // Mouse down - start drawing
+    drawingLayer.on("mousedown", function(event: MouseEvent) {
       event.stopPropagation();
       event.preventDefault();
-
-      drawing = true;
-      const dateX = bounds.xScale.invert(x);
-      const priceY = bounds.yScale.invert(y);
+      
+      const [x, y] = d3.pointer(event, g.node());
+      const scales = getCurrentScales();
+      
+      // Check bounds
+      if (x < 0 || x > width || y < 0 || y > height * 0.75) return;
+      
+      isDrawing = true;
+      const dateX = scales.xScale.invert(x);
+      const priceY = scales.yScale.invert(y);
 
       currentDrawing = {
         type: drawingMode,
@@ -375,56 +334,54 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
       console.log('Drawing started:', currentDrawing);
     });
 
-    drawingInteractionLayer.on("mousemove", function(event: MouseEvent) {
-      if (!drawing || !currentDrawing) return;
+    // Mouse move - update drawing
+    drawingLayer.on("mousemove", function(event: MouseEvent) {
+      if (!isDrawing || !currentDrawing) return;
 
       const [x, y] = d3.pointer(event, g.node());
-      const bounds = getCurrentDrawingBounds();
+      const scales = getCurrentScales();
+      
+      const constrainedX = Math.max(0, Math.min(x, width));
+      const constrainedY = Math.max(0, Math.min(y, height * 0.75));
 
-      if (!bounds) return;
-
-      const constrainedX = Math.max(0, Math.min(x, bounds.drawingWidth));
-      const constrainedY = Math.max(0, Math.min(y, bounds.drawingHeight * 0.75));
-
-      const dateX = bounds.xScale.invert(constrainedX);
-      const priceY = bounds.yScale.invert(constrainedY);
+      const dateX = scales.xScale.invert(constrainedX);
+      const priceY = scales.yScale.invert(constrainedY);
 
       currentDrawing.end = { x: dateX, y: priceY };
 
-      g.selectAll(".drawing-preview").remove();
+      // Update preview
       g.selectAll(".drawing-preview-layer").remove();
-      renderDrawingPreview(g, currentDrawing, bounds.xScale, bounds.yScale);
+      renderDrawingPreview(g, currentDrawing, scales.xScale, scales.yScale);
     });
 
-    drawingInteractionLayer.on("mouseup", function() {
-      if (!drawing || !currentDrawing) return;
+    // Mouse up - finish drawing
+    drawingLayer.on("mouseup", function(event: MouseEvent) {
+      if (!isDrawing || !currentDrawing) return;
 
-      drawing = false;
-
+      isDrawing = false;
+      
       const startX = currentDrawing.start.x.getTime ? currentDrawing.start.x.getTime() : currentDrawing.start.x;
       const endX = currentDrawing.end.x.getTime ? currentDrawing.end.x.getTime() : currentDrawing.end.x;
       const startY = currentDrawing.start.y;
       const endY = currentDrawing.end.y;
 
+      // Only add if drawing is significant
       if (Math.abs(startX - endX) > 1000 || Math.abs(startY - endY) > 0.01) {
         drawingsRef.current.push({ ...currentDrawing });
         console.log('Drawing added:', currentDrawing);
-        console.log('Total drawings:', drawingsRef.current.length);
+        
+        // Re-render all drawings
+        const scales = getCurrentScales();
+        renderDrawings(g, drawingsRef.current, scales.xScale, scales.yScale);
       }
 
-      g.selectAll(".drawing-preview").remove();
+      // Clear preview
       g.selectAll(".drawing-preview-layer").remove();
-
-      const bounds = getCurrentDrawingBounds();
-      if (bounds) {
-        renderDrawings(g, drawingsRef.current, bounds.xScale, bounds.yScale);
-      }
-
       currentDrawing = null;
     });
   }
 
-  // Add keyboard support for deleting selected drawings
+  // Keyboard support for deletion
   if (typeof window !== 'undefined') {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (drawingMode === 'none' && selectedDrawing && (event.key === 'Delete' || event.key === 'Backspace')) {
@@ -434,16 +391,14 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
           drawingsRef.current.splice(index, 1);
           selectedDrawing = null;
           clearDrawingSelection(g);
-          const bounds = getCurrentDrawingBounds();
-          if (bounds) {
-            renderDrawings(g, drawingsRef.current, bounds.xScale, bounds.yScale);
-          }
-          console.log('Drawing deleted, remaining:', drawingsRef.current.length);
+          const scales = getCurrentScales();
+          renderDrawings(g, drawingsRef.current, scales.xScale, scales.yScale);
+          console.log('Drawing deleted');
         }
       }
     };
 
-    // Remove existing listener if it exists
+    // Clean up old listener
     const existingHandler = (svg.node() as any).__keydownHandler;
     if (existingHandler) {
       window.removeEventListener('keydown', existingHandler);
@@ -456,7 +411,7 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
 
 // Helper function to check if a point is on a drawing
 const isPointOnDrawing = (x: number, y: number, drawing: any, xScale: any, yScale: any): boolean => {
-  const tolerance = 5; // pixels
+  const tolerance = 5;
 
   switch (drawing.type) {
     case 'line':
@@ -469,7 +424,6 @@ const isPointOnDrawing = (x: number, y: number, drawing: any, xScale: any, yScal
       const rectY = Math.min(yScale(drawing.start.y), yScale(drawing.end.y));
       const rectWidth = Math.abs(xScale(drawing.end.x) - xScale(drawing.start.x));
       const rectHeight = Math.abs(yScale(drawing.end.y) - yScale(drawing.start.y));
-
       return x >= rectX && x <= rectX + rectWidth && y >= rectY && y <= rectY + rectHeight;
 
     case 'circle':
@@ -480,7 +434,6 @@ const isPointOnDrawing = (x: number, y: number, drawing: any, xScale: any, yScal
         Math.pow(yScale(drawing.end.y) - centerY, 2)
       );
       const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
-
       return Math.abs(distance - radius) <= tolerance;
 
     case 'horizontal':
@@ -492,17 +445,13 @@ const isPointOnDrawing = (x: number, y: number, drawing: any, xScale: any, yScal
       return Math.abs(x - lineX) <= tolerance;
 
     case 'fibonacci':
-      // Check if point is near any of the fibonacci lines
       const fibLevels = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
       const startY = yScale(drawing.start.y);
       const endY = yScale(drawing.end.y);
       const diff = endY - startY;
-
       for (const level of fibLevels) {
         const fibY = startY + diff * level;
-        if (Math.abs(y - fibY) <= tolerance) {
-          return true;
-        }
+        if (Math.abs(y - fibY) <= tolerance) return true;
       }
       return false;
 
@@ -516,8 +465,6 @@ const isPointOnLine = (px: number, py: number, x1: number, y1: number, x2: numbe
   const lineLength = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
   const distanceToStart = Math.sqrt(Math.pow(px - x1, 2) + Math.pow(py - y1, 2));
   const distanceToEnd = Math.sqrt(Math.pow(px - x2, 2) + Math.pow(py - y2, 2));
-
-  // Check if point is approximately on the line using the triangle inequality
   return Math.abs(distanceToStart + distanceToEnd - lineLength) <= tolerance;
 };
 
@@ -580,14 +527,13 @@ const highlightSelectedDrawing = (g: any, drawing: any, xScale: any, yScale: any
       break;
   }
 
-  // Add selection indicators (small squares at key points)
+  // Add selection handles
   addSelectionHandles(selectionLayer, drawing, xScale, yScale);
 };
 
 // Function to add selection handles
 const addSelectionHandles = (layer: any, drawing: any, xScale: any, yScale: any) => {
   const handleSize = 6;
-
   const handles = [];
 
   switch (drawing.type) {
