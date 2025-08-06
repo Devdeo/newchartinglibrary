@@ -154,7 +154,7 @@ export const renderDrawings = (g: any, drawings: DrawingObject[], xScale: any, y
   const drawingsLayer = g.append("g")
     .attr("class", "drawings-layer")
     .attr("clip-path", "url(#chart-clip)")
-    .style("pointer-events", "all");
+    .style("pointer-events", "none"); // Don't interfere with zoom/selection
 
   drawings.forEach(drawing => {
     switch (drawing.type) {
@@ -260,10 +260,23 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
   }
 
   if (drawingMode === 'none') {
-    // Select mode - use event delegation for drawing selection without blocking zoom
-    svg.on("click.drawing", function(event: MouseEvent) {
-      // Only handle click if it's not part of a zoom/pan gesture
-      if (event.defaultPrevented) return;
+    // Create a separate transparent overlay for drawing selection that doesn't interfere with zoom
+    g.selectAll(".drawing-selection-overlay").remove();
+    
+    const selectionOverlay = g.append("rect")
+      .attr("class", "drawing-selection-overlay")
+      .attr("x", 0)
+      .attr("y", 0)
+      .attr("width", width)
+      .attr("height", height * 0.75)
+      .attr("fill", "transparent")
+      .style("pointer-events", "all")
+      .style("cursor", "pointer");
+
+    // Handle selection on the overlay, not the main svg
+    selectionOverlay.on("click", function(event: MouseEvent) {
+      // Prevent this click from bubbling to chart zoom handlers
+      event.stopPropagation();
       
       const [x, y] = d3.pointer(event, g.node());
       const bounds = getCurrentDrawingBounds();
@@ -295,10 +308,19 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
       }
     });
 
+    // Clear any drawing event handlers from svg
+    svg.on("click.drawing", null);
+    svg.on("mousedown.drawing", null);
+    svg.on("mousemove.drawing", null);
+    svg.on("mouseup.drawing", null);
+
   } else {
     // Drawing mode - create interaction layer only when actively drawing
     selectedDrawing = null;
     clearDrawingSelection(g);
+    
+    // Remove selection overlay when switching to drawing mode
+    g.selectAll(".drawing-selection-overlay").remove();
 
     svg.style("cursor", "crosshair");
     
