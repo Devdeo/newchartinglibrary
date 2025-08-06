@@ -309,11 +309,17 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   useEffect(() => {
     return () => {
       // Cleanup any global event listeners when component unmounts or drawing mode changes
-      if (typeof window !== 'undefined') {
-        const drawingArea = d3.select('.drawing-area').node();
-        if (drawingArea && (drawingArea as any).__keydownHandler) {
-          window.removeEventListener('keydown', (drawingArea as any).__keydownHandler);
+      if (typeof window !== 'undefined' && svgRef.current) {
+        const svgNode = d3.select(svgRef.current).node();
+        if (svgNode && (svgNode as any).__keydownHandler) {
+          window.removeEventListener('keydown', (svgNode as any).__keydownHandler);
         }
+        // Clear drawing event handlers
+        d3.select(svgRef.current)
+          .on("mousedown.drawing", null)
+          .on("mousemove.drawing", null)
+          .on("mouseup.drawing", null)
+          .on("click.drawing", null);
       }
     };
   }, [drawingMode]);

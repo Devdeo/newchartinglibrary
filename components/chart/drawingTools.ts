@@ -253,36 +253,27 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
   g.selectAll(".drawing-area").remove();
   g.selectAll(".drawing-interaction-layer").remove();
 
-  // Create a dedicated interaction layer that sits above the chart but below other UI elements
-  const interactionLayer = g.append("g")
-    .attr("class", "drawing-interaction-layer")
-    .style("pointer-events", "all");
-
-  const drawingArea = interactionLayer.append("rect")
-    .attr("class", "drawing-area")
-    .attr("x", 0)
-    .attr("y", 0)
-    .attr("width", xScale.range()[1])
-    .attr("height", yScale.range()[0] * 0.75)
-    .attr("fill", "transparent")
-    .style("pointer-events", "all");
+  // Always keep chart zoom functionality enabled
+  const chartArea = g.select('.chart-zoom-area');
+  if (chartArea.node()) {
+    chartArea.style("pointer-events", "all");
+  }
 
   if (drawingMode === 'none') {
-    // Select mode - disable zoom behaviors on the chart area to avoid conflicts
-    const chartArea = g.select('.chart-zoom-area');
-    if (chartArea.node()) {
-      chartArea.style("pointer-events", "none");
-    }
-
-    drawingArea.style("cursor", "default");
-    drawingArea.on("click", function(event: MouseEvent) {
-      event.stopPropagation();
-      event.preventDefault();
+    // Select mode - use event delegation for drawing selection without blocking zoom
+    svg.on("click.drawing", function(event: MouseEvent) {
+      // Only handle click if it's not part of a zoom/pan gesture
+      if (event.defaultPrevented) return;
       
-      const [x, y] = d3.pointer(event, this);
+      const [x, y] = d3.pointer(event, g.node());
       const bounds = getCurrentDrawingBounds();
 
       if (!bounds) return;
+
+      // Check if click is within chart area
+      if (x < 0 || x > bounds.drawingWidth || y < 0 || y > bounds.drawingHeight * 0.75) {
+        return;
+      }
 
       let foundDrawing = null;
       // Iterate over drawings in reverse to select the topmost one
@@ -304,32 +295,28 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
       }
     });
 
-    // Clear any drawing event handlers
-    drawingArea.on("mousedown", null);
-    drawingArea.on("mousemove", null);
-    drawingArea.on("mouseup", null);
-    drawingArea.on("mouseleave", null);
-
   } else {
-    // Drawing mode - re-enable zoom behaviors
-    const chartArea = g.select('.chart-zoom-area');
-    if (chartArea.node()) {
-      chartArea.style("pointer-events", "all");
-    }
-
+    // Drawing mode - create interaction layer only when actively drawing
     selectedDrawing = null;
     clearDrawingSelection(g);
 
-    drawingArea.style("cursor", "crosshair");
+    svg.style("cursor", "crosshair");
     
-    drawingArea.on("mousedown", function(event: MouseEvent) {
-      event.stopPropagation();
-      event.preventDefault();
-
-      const [x, y] = d3.pointer(event, this);
+    // Use event delegation for drawing interactions
+    svg.on("mousedown.drawing", function(event: MouseEvent) {
+      const [x, y] = d3.pointer(event, g.node());
       const bounds = getCurrentDrawingBounds();
 
       if (!bounds) return;
+
+      // Check if click is within chart drawing area
+      if (x < 0 || x > bounds.drawingWidth || y < 0 || y > bounds.drawingHeight * 0.75) {
+        return;
+      }
+
+      // Prevent zoom from starting when we're drawing
+      event.stopPropagation();
+      event.preventDefault();
 
       drawing = true;
       const dateX = bounds.xScale.invert(x);
@@ -344,16 +331,16 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
       console.log('Drawing started:', currentDrawing);
     });
 
-    drawingArea.on("mousemove", function(event: MouseEvent) {
+    svg.on("mousemove.drawing", function(event: MouseEvent) {
       if (!drawing || !currentDrawing) return;
 
-      const [x, y] = d3.pointer(event, this);
+      const [x, y] = d3.pointer(event, g.node());
       const bounds = getCurrentDrawingBounds();
 
       if (!bounds) return;
 
       const constrainedX = Math.max(0, Math.min(x, bounds.drawingWidth));
-      const constrainedY = Math.max(0, Math.min(y, bounds.drawingHeight));
+      const constrainedY = Math.max(0, Math.min(y, bounds.drawingHeight * 0.75));
 
       const dateX = bounds.xScale.invert(constrainedX);
       const priceY = bounds.yScale.invert(constrainedY);
@@ -365,7 +352,7 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
       renderDrawingPreview(g, currentDrawing, bounds.xScale, bounds.yScale);
     });
 
-    drawingArea.on("mouseup", function() {
+    svg.on("mouseup.drawing", function() {
       if (!drawing || !currentDrawing) return;
 
       drawing = false;
@@ -392,17 +379,8 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
       currentDrawing = null;
     });
 
-    drawingArea.on("mouseleave", function() {
-      if (drawing) {
-        drawing = false;
-        g.selectAll(".drawing-preview").remove();
-        g.selectAll(".drawing-preview-layer").remove();
-        currentDrawing = null;
-      }
-    });
-
     // Clear selection handlers
-    drawingArea.on("click", null);
+    svg.on("click.drawing", null);
   }
 
   // Add keyboard support for deleting selected drawings
@@ -425,13 +403,13 @@ export const setupDrawingInteractions = (svg: any, g: any, xScale: any, yScale: 
     };
 
     // Remove existing listener if it exists
-    const existingHandler = (drawingArea.node() as any).__keydownHandler;
+    const existingHandler = (svg.node() as any).__keydownHandler;
     if (existingHandler) {
       window.removeEventListener('keydown', existingHandler);
     }
 
     window.addEventListener('keydown', handleKeyDown);
-    (drawingArea.node() as any).__keydownHandler = handleKeyDown;
+    (svg.node() as any).__keydownHandler = handleKeyDown;
   }
 };
 
