@@ -114,25 +114,24 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       .scaleExtent([0.1, 50])
       .translateExtent([[-width * 5, -height * 5], [width * 6, height * 6]])
       .filter((event) => {
-        // Allow wheel events and touch events
-        if (event.type.includes('wheel') || event.type.includes('touch') || event.type.includes('pointer')) {
-          return true;
-        }
-        return false;
+        // Only allow wheel events for zooming
+        return event.type === 'wheel';
       })
       .on("zoom", (event) => {
-        // Prevent default zoom behavior, we'll handle it manually
-        event.preventDefault;
+        // Prevent default browser zoom
+        event.sourceEvent.preventDefault();
         
         // Get the wheel delta for zoom direction
-        const delta = event.sourceEvent.deltaY || event.sourceEvent.wheelDelta;
+        const delta = event.sourceEvent.deltaY;
+        if (!delta) return;
+        
         const zoomFactor = delta > 0 ? 0.9 : 1.1;
         
         // Get mouse position relative to the chart area
         const [mouseX, mouseY] = d3.pointer(event.sourceEvent, chartArea.node());
         
         // Define axis areas more precisely
-        const priceAxisStart = width - 60; // Price axis area starts 60px from right edge
+        const priceAxisStart = width - 80; // Price axis area starts 80px from right edge
         const timeAxisStart = height * 0.85; // Time axis starts at 85% of height
         
         // Determine which axis to zoom based on mouse position
@@ -141,11 +140,14 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           const currentDomain = yScale.domain();
           const domainRange = currentDomain[1] - currentDomain[0];
           const newRange = domainRange * (1 / zoomFactor);
-          const center = currentDomain[0] + domainRange / 2;
+          
+          // Calculate mouse position in price coordinates for centered zoom
+          const mousePrice = yScale.invert(mouseY);
+          const mouseFraction = (mousePrice - currentDomain[0]) / domainRange;
           
           const newDomain = [
-            center - newRange / 2,
-            center + newRange / 2
+            mousePrice - newRange * mouseFraction,
+            mousePrice + newRange * (1 - mouseFraction)
           ];
           
           const newYScale = yScale.copy().domain(newDomain);
@@ -155,11 +157,14 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           const currentDomain = xScale.domain();
           const domainRange = currentDomain[1].getTime() - currentDomain[0].getTime();
           const newRange = domainRange * (1 / zoomFactor);
-          const center = currentDomain[0].getTime() + domainRange / 2;
+          
+          // Calculate mouse position in time coordinates for centered zoom
+          const mouseTime = xScale.invert(mouseX);
+          const mouseFraction = (mouseTime.getTime() - currentDomain[0].getTime()) / domainRange;
           
           const newDomain = [
-            new Date(center - newRange / 2),
-            new Date(center + newRange / 2)
+            new Date(mouseTime.getTime() - newRange * mouseFraction),
+            new Date(mouseTime.getTime() + newRange * (1 - mouseFraction))
           ];
           
           const newXScale = xScale.copy().domain(newDomain);
@@ -169,11 +174,14 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           const currentDomain = xScale.domain();
           const domainRange = currentDomain[1].getTime() - currentDomain[0].getTime();
           const newRange = domainRange * (1 / zoomFactor);
-          const center = currentDomain[0].getTime() + domainRange / 2;
+          
+          // Calculate mouse position in time coordinates for centered zoom
+          const mouseTime = xScale.invert(mouseX);
+          const mouseFraction = (mouseTime.getTime() - currentDomain[0].getTime()) / domainRange;
           
           const newDomain = [
-            new Date(center - newRange / 2),
-            new Date(center + newRange / 2)
+            new Date(mouseTime.getTime() - newRange * mouseFraction),
+            new Date(mouseTime.getTime() + newRange * (1 - mouseFraction))
           ];
           
           const newXScale = xScale.copy().domain(newDomain);
