@@ -109,59 +109,185 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       };
     };
 
-    // Position-based zoom behavior
+    // TradingView-like zoom behavior
     const zoom = d3.zoom<SVGRectElement, unknown>()
-      .scaleExtent([0.1, 50])
+      .scaleExtent([0.01, 1000])
+      .filter((event) => {
+        // Allow wheel events and touch gestures for zooming
+        return event.type === 'wheel' || event.type.startsWith('touch');
+      })
       .on("zoom", (event) => {
-        // Only handle wheel events for custom zoom behavior
         if (event.sourceEvent && event.sourceEvent.type === 'wheel') {
           event.sourceEvent.preventDefault();
           
           const delta = event.sourceEvent.deltaY;
           if (!delta) return;
           
-          const zoomFactor = delta > 0 ? 0.9 : 1.1;
+          // More responsive zoom factors like TradingView
+          const zoomFactor = delta > 0 ? 0.85 : 1.18;
           const [mouseX, mouseY] = d3.pointer(event.sourceEvent, chartArea.node());
           
-          // Define axis areas
-          const priceAxisStart = width - 80;
-          const timeAxisStart = height * 0.85;
+          // Define axis areas more precisely
+          const priceAxisStart = width - 60;
+          const timeAxisStart = height * 0.75; // Above volume panel
           
-          if (mouseX > priceAxisStart) {
-            // Price axis zoom
-            const currentDomain = yScale.domain();
-            const domainRange = currentDomain[1] - currentDomain[0];
-            const newRange = domainRange * (1 / zoomFactor);
-            const mousePrice = yScale.invert(mouseY);
-            const mouseFraction = (mousePrice - currentDomain[0]) / domainRange;
-            
-            const newDomain = [
-              mousePrice - newRange * mouseFraction,
-              mousePrice + newRange * (1 - mouseFraction)
-            ];
-            
-            const newYScale = yScale.copy().domain(newDomain);
-            updateChart(xScale, newYScale);
+          // Determine zoom type based on mouse position
+          if (mouseX > priceAxisStart && mouseY < timeAxisStart) {
+            // Price axis zoom - mouse is over right price area
+            handlePriceZoom(mouseX, mouseY, zoomFactor);
+          } else if (mouseY > timeAxisStart) {
+            // Time axis zoom - mouse is over time/volume area
+            handleTimeZoom(mouseX, mouseY, zoomFactor);
           } else {
-            // Time axis zoom (for both time axis area and main chart)
-            const currentDomain = xScale.domain();
-            const domainRange = currentDomain[1].getTime() - currentDomain[0].getTime();
-            const newRange = domainRange * (1 / zoomFactor);
-            const mouseTime = xScale.invert(mouseX);
-            const mouseFraction = (mouseTime.getTime() - currentDomain[0].getTime()) / domainRange;
-            
-            const newDomain = [
-              new Date(mouseTime.getTime() - newRange * mouseFraction),
-              new Date(mouseTime.getTime() + newRange * (1 - mouseFraction))
-            ];
-            
-            const newXScale = xScale.copy().domain(newDomain);
-            updateChart(newXScale, yScale);
+            // Main chart area - determine based on modifier keys or default to time zoom
+            if (event.sourceEvent.shiftKey || event.sourceEvent.ctrlKey) {
+              handlePriceZoom(mouseX, mouseY, zoomFactor);
+            } else {
+              handleTimeZoom(mouseX, mouseY, zoomFactor);
+            }
           }
+        } else if (event.transform && event.sourceEvent) {
+          // Handle d3 zoom transform for pan and pinch gestures
+          const transform = event.transform;
+          
+          // Apply transform to time axis (horizontal pan/zoom)
+          const currentDomain = xScale.domain();
+          const domainWidth = currentDomain[1].getTime() - currentDomain[0].getTime();
+          const scaledWidth = domainWidth / transform.k;
+          const centerTime = new Date((currentDomain[0].getTime() + currentDomain[1].getTime()) / 2);
+          const offsetTime = -transform.x * scaledWidth / width;
+          
+          const newDomain = [
+            new Date(centerTime.getTime() - scaledWidth / 2 + offsetTime),
+            new Date(centerTime.getTime() + scaledWidth / 2 + offsetTime)
+          ];
+          
+          const newXScale = xScale.copy().domain(newDomain);
+          updateChart(newXScale, yScale);
         }
       });
 
-    // Custom touch event handlers for gesture detection
+    // Helper function for price axis zoom
+    const handlePriceZoom = (mouseX: number, mouseY: number, zoomFactor: number) => {
+      const currentDomain = yScale.domain();
+      const domainRange = currentDomain[1] - currentDomain[0];
+      const newRange = domainRange * (1 / zoomFactor);
+      
+      // Get mouse position in price coordinates
+      const mousePrice = yScale.invert(mouseY);
+      
+      // Keep the price under the mouse cursor fixed
+      const mouseFraction = (mousePrice - currentDomain[0]) / domainRange;
+      
+      const newDomain = [
+        mousePrice - newRange * mouseFraction,
+        mousePrice + newRange * (1 - mouseFraction)
+      ];
+      
+      // Prevent zooming out too far
+      const originalPriceRange = d3.extent(data.flatMap(d => [d.open, d.high, d.low, d.close])) as [number, number];
+      const maxRange = (originalPriceRange[1] - originalPriceRange[0]) * 5;
+      
+      if (newRange <= maxRange) {
+        const newYScale = yScale.copy().domain(newDomain);
+        updateChart(xScale, newYScale);
+      }
+    };
+
+    // Helper function for time axis zoom
+    const handleTimeZoom = (mouseX: number, mouseY: number, zoomFactor: number) => {
+      const currentDomain = xScale.domain();
+      const domainRange = currentDomain[1].getTime() - currentDomain[0].getTime();
+      const newRange = domainRange * (1 / zoomFactor);
+      
+      // Get mouse position in time coordinates
+      const mouseTime = xScale.invert(mouseX);
+      
+      // Keep the time under the mouse cursor fixed
+      const mouseFraction = (mouseTime.getTime() - currentDomain[0].getTime()) / domainRange;
+      
+      const newDomain = [
+        new Date(mouseTime.getTime() - newRange * mouseFraction),
+        new Date(mouseTime.getTime() + newRange * (1 - mouseFraction))
+      ];
+      
+      // Prevent zooming beyond data bounds
+      const dataExtent = d3.extent(data, d => d.date) as [Date, Date];
+      const maxRange = dataExtent[1].getTime() - dataExtent[0].getTime();
+      const minRange = maxRange / 1000; // Allow zooming in to show very few candles
+      
+      if (newRange >= minRange && newRange <= maxRange * 2) {
+        const newXScale = xScale.copy().domain(newDomain);
+        updateChart(newXScale, yScale);
+      }
+    };
+
+    // Enhanced pan and zoom interactions
+    let isPanning = false;
+    let lastPanX = 0;
+    let lastPanY = 0;
+
+    // Mouse pan with middle button (like TradingView)
+    chartArea.on('mousedown', function(event) {
+      if (event.button === 1) { // Middle mouse button
+        event.preventDefault();
+        isPanning = true;
+        lastPanX = event.clientX;
+        lastPanY = event.clientY;
+        d3.select('body').style('cursor', 'grabbing');
+      }
+    });
+
+    // Handle mouse move for panning
+    d3.select(window).on('mousemove.chart-pan', function(event) {
+      if (isPanning) {
+        const deltaX = event.clientX - lastPanX;
+        const deltaY = event.clientY - lastPanY;
+        
+        // Pan time axis
+        if (Math.abs(deltaX) > 2) {
+          const currentDomain = xScale.domain();
+          const domainRange = currentDomain[1].getTime() - currentDomain[0].getTime();
+          const timeOffset = -(deltaX / width) * domainRange;
+          
+          const newDomain = [
+            new Date(currentDomain[0].getTime() + timeOffset),
+            new Date(currentDomain[1].getTime() + timeOffset)
+          ];
+          
+          const newXScale = xScale.copy().domain(newDomain);
+          updateChart(newXScale, yScale);
+        }
+        
+        // Pan price axis
+        if (Math.abs(deltaY) > 2) {
+          const currentDomain = yScale.domain();
+          const domainRange = currentDomain[1] - currentDomain[0];
+          const priceOffset = (deltaY / (height * 0.7)) * domainRange;
+          
+          const newDomain = [
+            currentDomain[0] + priceOffset,
+            currentDomain[1] + priceOffset
+          ];
+          
+          const newYScale = yScale.copy().domain(newDomain);
+          updateChart(xScale, newYScale);
+        }
+        
+        lastPanX = event.clientX;
+        lastPanY = event.clientY;
+      }
+    });
+
+    // Stop panning
+    d3.select(window).on('mouseup.chart-pan', function() {
+      if (isPanning) {
+        isPanning = false;
+        d3.select('body').style('cursor', 'default');
+      }
+    });
+
+    // Enhanced touch gestures
     chartArea.on('touchstart', function(event) {
       const touches = event.touches;
       if (touches.length === 2) {
@@ -174,6 +300,9 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         touchState.initialCenter = getTouchCenter(touch1, touch2);
         touchState.lastDistance = touchState.initialDistance;
         touchState.lastCenter = touchState.initialCenter;
+      } else if (touches.length === 1) {
+        // Single finger pan
+        touchState.lastCenter = { x: touches[0].clientX, y: touches[0].clientY };
       }
     });
 
@@ -184,38 +313,142 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
         const touch1 = touches[0];
         const touch2 = touches[1];
-
         const currentDistance = getTouchDistance(touch1, touch2);
+        const currentCenter = getTouchCenter(touch1, touch2);
+        
+        // Zoom based on pinch
         const scaleFactor = currentDistance / touchState.lastDistance;
-
-        // Only apply horizontal (time) zoom for two-finger pinch
+        
+        // Pan based on center movement
+        const deltaX = currentCenter.x - touchState.lastCenter.x;
+        const deltaY = currentCenter.y - touchState.lastCenter.y;
+        
+        // Apply time zoom and pan
         const currentDomain = xScale.domain();
         const domainRange = currentDomain[1].getTime() - currentDomain[0].getTime();
         const newRange = domainRange * (1 / scaleFactor);
-        const center = currentDomain[0].getTime() + domainRange / 2;
+        const timeOffset = -(deltaX / width) * domainRange;
+        const centerTime = currentDomain[0].getTime() + domainRange / 2 + timeOffset;
         
         const newDomain = [
-          new Date(center - newRange / 2),
-          new Date(center + newRange / 2)
+          new Date(centerTime - newRange / 2),
+          new Date(centerTime + newRange / 2)
         ];
         
         const newXScale = xScale.copy().domain(newDomain);
         updateChart(newXScale, yScale);
 
         touchState.lastDistance = currentDistance;
+        touchState.lastCenter = currentCenter;
+      } else if (touches.length === 1) {
+        // Single finger pan
+        const touch = touches[0];
+        const deltaX = touch.clientX - touchState.lastCenter.x;
+        const deltaY = touch.clientY - touchState.lastCenter.y;
+        
+        if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+          event.preventDefault();
+          
+          // Pan time axis
+          const currentTimeDomain = xScale.domain();
+          const timeRange = currentTimeDomain[1].getTime() - currentTimeDomain[0].getTime();
+          const timeOffset = -(deltaX / width) * timeRange;
+          
+          const newTimeDomain = [
+            new Date(currentTimeDomain[0].getTime() + timeOffset),
+            new Date(currentTimeDomain[1].getTime() + timeOffset)
+          ];
+          
+          // Pan price axis
+          const currentPriceDomain = yScale.domain();
+          const priceRange = currentPriceDomain[1] - currentPriceDomain[0];
+          const priceOffset = (deltaY / (height * 0.7)) * priceRange;
+          
+          const newPriceDomain = [
+            currentPriceDomain[0] + priceOffset,
+            currentPriceDomain[1] + priceOffset
+          ];
+          
+          const newXScale = xScale.copy().domain(newTimeDomain);
+          const newYScale = yScale.copy().domain(newPriceDomain);
+          updateChart(newXScale, newYScale);
+          
+          touchState.lastCenter = { x: touch.clientX, y: touch.clientY };
+        }
       }
     });
 
     chartArea.on('touchend', function(event) {
       if (event.touches.length < 2) {
         touchState.lastDistance = 0;
+      }
+      if (event.touches.length === 0) {
         touchState.touches = [];
+        touchState.lastCenter = { x: 0, y: 0 };
       }
     });
 
     // Apply zoom behavior
     chartArea.call(zoom);
     zoomRef.current = zoom;
+
+    // Keyboard shortcuts for zoom controls (like TradingView)
+    d3.select(window).on('keydown.zoom-controls', function(event) {
+      if (event.target === document.body || event.target.tagName === 'SVG') {
+        switch(event.key) {
+          case 'r':
+          case 'R':
+            // Reset zoom to fit all data
+            resetZoom();
+            event.preventDefault();
+            break;
+          case '+':
+          case '=':
+            // Zoom in on center
+            zoomToCenter(1.2);
+            event.preventDefault();
+            break;
+          case '-':
+          case '_':
+            // Zoom out on center
+            zoomToCenter(0.8);
+            event.preventDefault();
+            break;
+        }
+      }
+    });
+
+    // Helper function to reset zoom
+    const resetZoom = () => {
+      const originalXDomain = d3.extent(data, d => d.date) as [Date, Date];
+      const allPrices = data.flatMap(d => [d.open, d.high, d.low, d.close]);
+      const originalPriceExtent = d3.extent(allPrices) as [number, number];
+      const pricePadding = (originalPriceExtent[1] - originalPriceExtent[0]) * 0.1;
+      
+      const resetXScale = xScale.copy().domain(originalXDomain);
+      const resetYScale = yScale.copy().domain([
+        originalPriceExtent[0] - pricePadding, 
+        originalPriceExtent[1] + pricePadding
+      ]);
+      
+      updateChart(resetXScale, resetYScale);
+    };
+
+    // Helper function to zoom to center
+    const zoomToCenter = (factor: number) => {
+      const currentDomain = xScale.domain();
+      const domainRange = currentDomain[1].getTime() - currentDomain[0].getTime();
+      const newRange = domainRange * (1 / factor);
+      const center = currentDomain[0].getTime() + domainRange / 2;
+      
+      const newDomain = [
+        new Date(center - newRange / 2),
+        new Date(center + newRange / 2)
+      ];
+      
+      const newXScale = xScale.copy().domain(newDomain);
+      updateChart(newXScale, yScale);
+    };
 
     // Initial render with full indicator setup
     updateChart(xScale, yScale, undefined, true);
