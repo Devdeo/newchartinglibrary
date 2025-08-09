@@ -181,7 +181,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .scale(currentTransform.k * scaleFactor, currentTransform.k);
         
         // Apply only time zoom transform
-        chartArea.call(timeZoom.transform, newTransform);
+        chartArea.call(positionBasedZoom.transform, newTransform);
 
         touchState.lastDistance = currentDistance;
       }
