@@ -121,27 +121,62 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         return false;
       })
       .on("zoom", (event) => {
-        const { transform } = event;
+        // Prevent default zoom behavior, we'll handle it manually
+        event.preventDefault;
+        
+        // Get the wheel delta for zoom direction
+        const delta = event.sourceEvent.deltaY || event.sourceEvent.wheelDelta;
+        const zoomFactor = delta > 0 ? 0.9 : 1.1;
         
         // Get mouse position relative to the chart area
         const [mouseX, mouseY] = d3.pointer(event.sourceEvent, chartArea.node());
         
-        // Define axis areas
-        const priceAxisArea = width - 80; // Right side for price axis (80px from right edge)
-        const timeAxisArea = height * 0.85; // Bottom area for time axis
+        // Define axis areas more precisely
+        const priceAxisStart = width - 60; // Price axis area starts 60px from right edge
+        const timeAxisStart = height * 0.85; // Time axis starts at 85% of height
         
         // Determine which axis to zoom based on mouse position
-        if (mouseX > priceAxisArea) {
+        if (mouseX > priceAxisStart) {
           // Mouse is over price axis area (right side) - zoom price axis only
-          const newYScale = transform.rescaleY(yScale);
+          const currentDomain = yScale.domain();
+          const domainRange = currentDomain[1] - currentDomain[0];
+          const newRange = domainRange * (1 / zoomFactor);
+          const center = currentDomain[0] + domainRange / 2;
+          
+          const newDomain = [
+            center - newRange / 2,
+            center + newRange / 2
+          ];
+          
+          const newYScale = yScale.copy().domain(newDomain);
           updateChart(xScale, newYScale);
-        } else if (mouseY > timeAxisArea) {
+        } else if (mouseY > timeAxisStart) {
           // Mouse is over time axis area (bottom) - zoom time axis only
-          const newXScale = transform.rescaleX(xScale);
+          const currentDomain = xScale.domain();
+          const domainRange = currentDomain[1].getTime() - currentDomain[0].getTime();
+          const newRange = domainRange * (1 / zoomFactor);
+          const center = currentDomain[0].getTime() + domainRange / 2;
+          
+          const newDomain = [
+            new Date(center - newRange / 2),
+            new Date(center + newRange / 2)
+          ];
+          
+          const newXScale = xScale.copy().domain(newDomain);
           updateChart(newXScale, yScale);
         } else {
           // Mouse is over main chart area - apply time zoom by default
-          const newXScale = transform.rescaleX(xScale);
+          const currentDomain = xScale.domain();
+          const domainRange = currentDomain[1].getTime() - currentDomain[0].getTime();
+          const newRange = domainRange * (1 / zoomFactor);
+          const center = currentDomain[0].getTime() + domainRange / 2;
+          
+          const newDomain = [
+            new Date(center - newRange / 2),
+            new Date(center + newRange / 2)
+          ];
+          
+          const newXScale = xScale.copy().domain(newDomain);
           updateChart(newXScale, yScale);
         }
       });
@@ -174,14 +209,18 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         const scaleFactor = currentDistance / touchState.lastDistance;
 
         // Only apply horizontal (time) zoom for two-finger pinch
-        const currentTransform = d3.zoomTransform(chartArea.node()!);
-        // Create new transform that only affects X (time) scaling, preserve Y
-        const newTransform = d3.zoomIdentity
-          .translate(currentTransform.x * scaleFactor, currentTransform.y)
-          .scale(currentTransform.k * scaleFactor, currentTransform.k);
+        const currentDomain = xScale.domain();
+        const domainRange = currentDomain[1].getTime() - currentDomain[0].getTime();
+        const newRange = domainRange * (1 / scaleFactor);
+        const center = currentDomain[0].getTime() + domainRange / 2;
         
-        // Apply only time zoom transform
-        chartArea.call(positionBasedZoom.transform, newTransform);
+        const newDomain = [
+          new Date(center - newRange / 2),
+          new Date(center + newRange / 2)
+        ];
+        
+        const newXScale = xScale.copy().domain(newDomain);
+        updateChart(newXScale, yScale);
 
         touchState.lastDistance = currentDistance;
       }
