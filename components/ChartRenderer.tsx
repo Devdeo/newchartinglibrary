@@ -179,22 +179,8 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         touchState.lastDistance = touchState.initialDistance;
         touchState.lastCenter = touchState.initialCenter;
 
-        // Determine zoom mode based on gesture direction
-        const rect = chartArea.node()!.getBoundingClientRect();
-        const centerX = touchState.initialCenter.x - rect.left;
-        const centerY = touchState.initialCenter.y - rect.top;
-
-        const dx = Math.abs(touch1.clientX - touch2.clientX);
-        const dy = Math.abs(touch1.clientY - touch2.clientY);
-
-        // Determine zoom direction based on touch orientation
-        if (dx > dy * 1.5) {
-          touchState.zoomMode = 'time'; // Horizontal gesture
-        } else if (dy > dx * 1.5) {
-          touchState.zoomMode = 'price'; // Vertical gesture
-        } else {
-          touchState.zoomMode = 'both'; // Diagonal gesture
-        }
+        // Always set to time zoom for two-finger pinch
+        touchState.zoomMode = 'time';
       }
     });
 
@@ -216,20 +202,10 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         const chartX = currentCenter.x - rect.left;
         const chartY = currentCenter.y - rect.top;
 
-        // Apply zoom based on detected mode
-        if (touchState.zoomMode === 'time') {
-          const currentTransform = d3.zoomTransform(chartArea.node()!);
-          const newTransform = currentTransform.scale(scaleFactor);
-          timeZoom.transform(chartArea, newTransform);
-        } else if (touchState.zoomMode === 'price') {
-          const currentTransform = d3.zoomTransform(chartArea.node()!);
-          const newTransform = currentTransform.scale(scaleFactor);
-          priceZoom.transform(chartArea, newTransform);
-        } else if (touchState.zoomMode === 'both') {
-          const currentTransform = d3.zoomTransform(chartArea.node()!);
-          const newTransform = currentTransform.scale(scaleFactor);
-          combinedZoom.transform(chartArea, newTransform);
-        }
+        // Always apply time zoom for two-finger pinch
+        const currentTransform = d3.zoomTransform(chartArea.node()!);
+        const newTransform = currentTransform.scale(scaleFactor);
+        timeZoom.transform(chartArea, newTransform);
 
         touchState.lastDistance = currentDistance;
         touchState.lastCenter = currentCenter;
