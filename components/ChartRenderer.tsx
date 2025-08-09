@@ -118,7 +118,10 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         if (event.type.includes('wheel')) {
           return !event.shiftKey && !event.ctrlKey && !event.metaKey;
         }
-        // Allow touch events
+        // For touch events - prevent default zoom behavior, handle manually
+        if (event.type.includes('touch') && event.touches && event.touches.length === 2) {
+          return false;
+        }
         return event.type.includes('touch') || event.type.includes('pointer');
       })
       .on("zoom", (event) => {
@@ -193,8 +196,13 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
         // Only apply horizontal (time) zoom for two-finger pinch
         const currentTransform = d3.zoomTransform(chartArea.node()!);
-        const newTransform = currentTransform.scale(scaleFactor);
-        timeZoom.transform(chartArea, newTransform);
+        // Create new transform that only affects X (time) scaling, preserve Y
+        const newTransform = d3.zoomIdentity
+          .translate(currentTransform.x * scaleFactor, currentTransform.y)
+          .scale(currentTransform.k * scaleFactor, currentTransform.k);
+        
+        // Apply only time zoom transform
+        chartArea.call(timeZoom.transform, newTransform);
 
         touchState.lastDistance = currentDistance;
       }
