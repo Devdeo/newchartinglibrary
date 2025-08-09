@@ -4,7 +4,18 @@ import { CandleData } from '../TradingChart';
 import { calculateHeikinAshi } from './chartUtils';
 
 export const renderCandlesticks = (g: any, xScale: any, yScale: any, data: CandleData[]) => {
-  const candleWidth = Math.max(1, (xScale.range()[1] - xScale.range()[0]) / data.length * 0.8);
+  // Get the current zoom transform to calculate dynamic width
+  const currentTransform = d3.zoomTransform(g.node());
+  const zoomScale = currentTransform ? currentTransform.k : 1;
+  
+  // Calculate base width from visible data range
+  const visibleDomain = xScale.domain();
+  const visibleData = data.filter(d => d.date >= visibleDomain[0] && d.date <= visibleDomain[1]);
+  const visibleDataLength = Math.max(visibleData.length, 1);
+  
+  // Dynamic width calculation based on zoom level and visible data
+  const baseWidth = (xScale.range()[1] - xScale.range()[0]) / visibleDataLength;
+  const candleWidth = Math.max(0.5, Math.min(50, baseWidth * 0.8 * Math.sqrt(zoomScale)));
 
   const candlesGroup = g.append("g")
     .attr("class", "candles-group")
@@ -75,7 +86,18 @@ export const renderAreaChart = (g: any, xScale: any, yScale: any, data: CandleDa
 };
 
 export const renderBarChart = (g: any, xScale: any, yScale: any, data: CandleData[]) => {
-  const barWidth = Math.max(1, (xScale.range()[1] - xScale.range()[0]) / data.length * 0.8);
+  // Get the current zoom transform to calculate dynamic width
+  const currentTransform = d3.zoomTransform(g.node());
+  const zoomScale = currentTransform ? currentTransform.k : 1;
+  
+  // Calculate base width from visible data range
+  const visibleDomain = xScale.domain();
+  const visibleData = data.filter(d => d.date >= visibleDomain[0] && d.date <= visibleDomain[1]);
+  const visibleDataLength = Math.max(visibleData.length, 1);
+  
+  // Dynamic width calculation based on zoom level
+  const baseWidth = (xScale.range()[1] - xScale.range()[0]) / visibleDataLength;
+  const barWidth = Math.max(0.5, Math.min(50, baseWidth * 0.8 * Math.sqrt(zoomScale)));
 
   g.selectAll(".bar")
     .data(data)
@@ -91,7 +113,19 @@ export const renderBarChart = (g: any, xScale: any, yScale: any, data: CandleDat
 
 export const renderHeikinAshi = (g: any, xScale: any, yScale: any, data: CandleData[]) => {
   const haData = calculateHeikinAshi(data);
-  const candleWidth = Math.max(1, (xScale.range()[1] - xScale.range()[0]) / haData.length * 0.8);
+  
+  // Get the current zoom transform to calculate dynamic width
+  const currentTransform = d3.zoomTransform(g.node());
+  const zoomScale = currentTransform ? currentTransform.k : 1;
+  
+  // Calculate base width from visible data range
+  const visibleDomain = xScale.domain();
+  const visibleHAData = haData.filter(d => d.date >= visibleDomain[0] && d.date <= visibleDomain[1]);
+  const visibleDataLength = Math.max(visibleHAData.length, 1);
+  
+  // Dynamic width calculation based on zoom level
+  const baseWidth = (xScale.range()[1] - xScale.range()[0]) / visibleDataLength;
+  const candleWidth = Math.max(0.5, Math.min(50, baseWidth * 0.8 * Math.sqrt(zoomScale)));
 
   g.selectAll(".ha-candle")
     .data(haData)
@@ -125,7 +159,18 @@ export const renderHeikinAshi = (g: any, xScale: any, yScale: any, data: CandleD
 };
 
 export const renderVolume = (g: any, xScale: any, volumeScale: any, data: CandleData[]) => {
-  const barWidth = Math.max(1, (xScale.range()[1] - xScale.range()[0]) / data.length * 0.8);
+  // Get the current zoom transform to calculate dynamic width
+  const currentTransform = d3.zoomTransform(g.node());
+  const zoomScale = currentTransform ? currentTransform.k : 1;
+  
+  // Calculate base width from visible data range
+  const visibleDomain = xScale.domain();
+  const visibleData = data.filter(d => d.date >= visibleDomain[0] && d.date <= visibleDomain[1]);
+  const visibleDataLength = Math.max(visibleData.length, 1);
+  
+  // Dynamic width calculation based on zoom level
+  const baseWidth = (xScale.range()[1] - xScale.range()[0]) / visibleDataLength;
+  const barWidth = Math.max(0.5, Math.min(50, baseWidth * 0.8 * Math.sqrt(zoomScale)));
 
   const volumeGroup = g.append("g")
     .attr("class", "volume-group")
