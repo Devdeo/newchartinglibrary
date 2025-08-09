@@ -109,62 +109,41 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       };
     };
 
-    // Time axis zoom (default scroll for desktop, horizontal pinch for mobile)
-    const timeZoom = d3.zoom<SVGRectElement, unknown>()
-      .scaleExtent([0.1, 50])
-      .translateExtent([[-width * 5, 0], [width * 6, height * 0.85]])
-      .filter((event) => {
-        // For mouse events
-        if (event.type.includes('wheel')) {
-          return !event.shiftKey && !event.ctrlKey && !event.metaKey;
-        }
-        // For touch events - prevent default zoom behavior, handle manually
-        if (event.type.includes('touch') && event.touches && event.touches.length === 2) {
-          return false;
-        }
-        return event.type.includes('touch') || event.type.includes('pointer');
-      })
-      .on("zoom", (event) => {
-        const { transform } = event;
-        const newXScale = transform.rescaleX(xScale);
-        updateChart(newXScale, yScale);
-      });
-
-    // Price axis zoom (shift + scroll for desktop, vertical pinch for mobile)
-    const priceZoom = d3.zoom<SVGRectElement, unknown>()
-      .scaleExtent([0.1, 50])
-      .translateExtent([[0, -height * 5], [width, height * 6]])
-      .filter((event) => {
-        // For mouse events
-        if (event.type.includes('wheel')) {
-          return event.shiftKey && !event.ctrlKey && !event.metaKey;
-        }
-        // Allow touch events
-        return event.type.includes('touch') || event.type.includes('pointer');
-      })
-      .on("zoom", (event) => {
-        const { transform } = event;
-        const newYScale = transform.rescaleY(yScale);
-        updateChart(xScale, newYScale);
-      });
-
-    // Combined zoom for both axes (ctrl/cmd + scroll for desktop, two-finger pinch for mobile)
-    const combinedZoom = d3.zoom<SVGRectElement, unknown>()
+    // Position-based zoom behavior
+    const positionBasedZoom = d3.zoom<SVGRectElement, unknown>()
       .scaleExtent([0.1, 50])
       .translateExtent([[-width * 5, -height * 5], [width * 6, height * 6]])
       .filter((event) => {
-        // For mouse events
-        if (event.type.includes('wheel')) {
-          return event.ctrlKey || event.metaKey;
+        // Allow wheel events and touch events
+        if (event.type.includes('wheel') || event.type.includes('touch') || event.type.includes('pointer')) {
+          return true;
         }
-        // Allow touch events
-        return event.type.includes('touch') || event.type.includes('pointer');
+        return false;
       })
       .on("zoom", (event) => {
         const { transform } = event;
-        const newXScale = transform.rescaleX(xScale);
-        const newYScale = transform.rescaleY(yScale);
-        updateChart(newXScale, newYScale);
+        
+        // Get mouse position relative to the chart area
+        const [mouseX, mouseY] = d3.pointer(event.sourceEvent, chartArea.node());
+        
+        // Define axis areas
+        const priceAxisArea = width - 80; // Right side for price axis (80px from right edge)
+        const timeAxisArea = height * 0.85; // Bottom area for time axis
+        
+        // Determine which axis to zoom based on mouse position
+        if (mouseX > priceAxisArea) {
+          // Mouse is over price axis area (right side) - zoom price axis only
+          const newYScale = transform.rescaleY(yScale);
+          updateChart(xScale, newYScale);
+        } else if (mouseY > timeAxisArea) {
+          // Mouse is over time axis area (bottom) - zoom time axis only
+          const newXScale = transform.rescaleX(xScale);
+          updateChart(newXScale, yScale);
+        } else {
+          // Mouse is over main chart area - apply time zoom by default
+          const newXScale = transform.rescaleX(xScale);
+          updateChart(newXScale, yScale);
+        }
       });
 
     // Custom touch event handlers for gesture detection
@@ -215,9 +194,9 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       }
     });
 
-    // Apply zoom behaviors
-    chartArea.call(timeZoom).call(priceZoom).call(combinedZoom);
-    zoomRef.current = timeZoom;
+    // Apply position-based zoom behavior
+    chartArea.call(positionBasedZoom);
+    zoomRef.current = positionBasedZoom;
 
     // Initial render with full indicator setup
     updateChart(xScale, yScale, undefined, true);
