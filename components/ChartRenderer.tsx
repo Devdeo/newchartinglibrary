@@ -91,8 +91,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       lastDistance: 0,
       lastCenter: { x: 0, y: 0 },
       initialDistance: 0,
-      initialCenter: { x: 0, y: 0 },
-      zoomMode: 'none' // 'time', 'price', 'both'
+      initialCenter: { x: 0, y: 0 }
     };
 
     // Helper function to calculate distance between two touches
@@ -178,43 +177,32 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         touchState.initialCenter = getTouchCenter(touch1, touch2);
         touchState.lastDistance = touchState.initialDistance;
         touchState.lastCenter = touchState.initialCenter;
-
-        // Always set to time zoom for two-finger pinch
-        touchState.zoomMode = 'time';
       }
     });
 
     chartArea.on('touchmove', function(event) {
       const touches = event.touches;
-      if (touches.length === 2 && touchState.zoomMode !== 'none') {
+      if (touches.length === 2 && touchState.lastDistance > 0) {
         event.preventDefault();
 
         const touch1 = touches[0];
         const touch2 = touches[1];
 
         const currentDistance = getTouchDistance(touch1, touch2);
-        const currentCenter = getTouchCenter(touch1, touch2);
-
         const scaleFactor = currentDistance / touchState.lastDistance;
-        const rect = chartArea.node()!.getBoundingClientRect();
 
-        // Convert touch coordinates to chart coordinates
-        const chartX = currentCenter.x - rect.left;
-        const chartY = currentCenter.y - rect.top;
-
-        // Always apply time zoom for two-finger pinch
+        // Only apply horizontal (time) zoom for two-finger pinch
         const currentTransform = d3.zoomTransform(chartArea.node()!);
         const newTransform = currentTransform.scale(scaleFactor);
         timeZoom.transform(chartArea, newTransform);
 
         touchState.lastDistance = currentDistance;
-        touchState.lastCenter = currentCenter;
       }
     });
 
     chartArea.on('touchend', function(event) {
       if (event.touches.length < 2) {
-        touchState.zoomMode = 'none';
+        touchState.lastDistance = 0;
         touchState.touches = [];
       }
     });
